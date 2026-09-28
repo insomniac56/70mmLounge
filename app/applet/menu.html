@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>70MM Lounge & Bar — Customer Self-Ordering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-hover: #1f2937;
+      --surface-border: #1e293b;
+      --primary: #10b981;
+      --primary-glow: rgba(16, 185, 129, 0.25);
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.2);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --danger: #ef4444;
+      --safe-bottom: env(safe-area-inset-bottom, 16px);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(100px + var(--safe-bottom));
+      overflow-x: hidden;
+    }
+
+    /* Ambient Glow Background */
+    .ambient-glow {
+      position: fixed;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 450px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.12) 0%, rgba(245, 158, 11, 0.05) 50%, transparent 80%);
+      filter: blur(60px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Top Sticky Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(9, 13, 22, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--surface-border);
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 10px var(--primary);
+      display: inline-block;
+    }
+
+    .table-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 6px 12px;
+      border-radius: 12px;
+    }
+
+    .table-badge .tbl-num {
+      font-size: 13px;
+      font-weight: 900;
+      color: #34d399;
+      letter-spacing: 0.5px;
+    }
+
+    .table-badge .tbl-zone {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+
+    /* Main Container */
+    .main-wrap {
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 14px 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Live Status Banner (Visible after order placement or running bill) */
+    .status-card {
+      display: none;
+      background: linear-gradient(145deg, #131d2e 0%, #0d1523 100%);
+      border: 1.5px solid rgba(245, 158, 11, 0.45);
+      box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.15);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 18px;
+      animation: pulseGlow 2.5s infinite;
+    }
+
+    .status-card.active {
+      display: block;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { border-color: rgba(245, 158, 11, 0.4); }
+      50% { border-color: rgba(245, 158, 11, 0.85); box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.25); }
+    }
+
+    .status-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .status-tbl {
+      font-size: 14px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+
+    .status-pill {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .status-cooking {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid rgba(245, 158, 11, 0.5);
+    }
+
+    .status-ready {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.5);
+    }
+
+    .status-info {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .status-bill {
+      font-size: 13px;
+      font-weight: 800;
+      color: #fbbf24;
+      margin-bottom: 12px;
+    }
+
+    .btn-checkout-req {
+      width: 100%;
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      color: #ffffff;
+      border: none;
+      padding: 11px;
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-checkout-req:active {
+      transform: scale(0.98);
+    }
+
+    .btn-checkout-req.requested {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      color: #f59e0b;
+      cursor: default;
+    }
+
+    /* Search & Filter Controls */
+    .search-box {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--surface-border);
+      border-radius: 14px;
+      padding: 13px 14px 13px 44px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    /* Category Chips Carousel */
+    .cat-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      scrollbar-width: none;
+    }
+
+    .cat-scroll::-webkit-scrollbar {
+      display: none;
+    }
+
+    .cat-chip {
+      white-space: nowrap;
+      background: var(--card-bg);
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .cat-chip.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #064e3b;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    /* Dish Menu Grid */
+    .menu-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .menu-card {
+      background: var(--card-bg);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .menu-card:active {
+      transform: scale(0.99);
+    }
+
+    .card-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .type-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .veg-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: #22c55e;
+      display: inline-block;
+    }
+
+    .nonveg-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: #ef4444;
+      display: inline-block;
+    }
+
+    .item-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.3;
+    }
+
+    .item-desc {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .item-price {
+      font-size: 15px;
+      font-weight: 900;
+      color: #fbbf24;
+      margin-top: 4px;
+    }
+
+    /* Add to cart / Stepper */
+    .btn-add {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.25) 100%);
+      border: 1px solid var(--primary);
+      color: #34d399;
+      font-size: 13px;
+      font-weight: 800;
+      padding: 8px 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-add:hover {
+      background: var(--primary);
+      color: #064e3b;
+    }
+
+    .stepper {
+      display: flex;
+      align-items: center;
+      background: #1f2937;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .btn-step {
+      width: 34px;
+      height: 34px;
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-step:active {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .step-val {
+      min-width: 28px;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 900;
+      color: #34d399;
+    }
+
+    /* Sticky Bottom Cart Bar */
+    .cart-float {
+      position: fixed;
+      bottom: calc(14px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 32px);
+      max-width: 680px;
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      box-shadow: 0 12px 30px rgba(5, 150, 105, 0.4);
+      border: 1px solid rgba(52, 211, 153, 0.4);
+      border-radius: 18px;
+      padding: 12px 18px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 40;
+      cursor: pointer;
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .cart-float.show {
+      display: flex;
+    }
+
+    @keyframes popIn {
+      from { transform: translate(-50%, 40px); opacity: 0; }
+      to { transform: translate(-50%, 0); opacity: 1; }
+    }
+
+    .cart-summary {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cart-items-count {
+      font-size: 11px;
+      font-weight: 700;
+      color: #d1fae5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cart-total-val {
+      font-size: 18px;
+      font-weight: 900;
+      color: #ffffff;
+    }
+
+    .cart-action-btn {
+      background: #ffffff;
+      color: #065f46;
+      border: none;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Modal Sheet */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 50;
+      display: none;
+      justify-content: center;
+      align-items: flex-end;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #111827;
+      border-top: 1.5px solid var(--surface-border);
+      width: 100%;
+      max-width: 600px;
+      max-height: 88vh;
+      border-radius: 24px 24px 0 0;
+      padding: 20px 20px calc(24px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      animation: slideUp 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--surface-border);
+    }
+
+    .modal-head h3 {
+      font-size: 17px;
+      font-weight: 900;
+      color: #ffffff;
+    }
+
+    .btn-close {
+      background: #1f2937;
+      border: none;
+      color: #cbd5e1;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .form-input {
+      width: 100%;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+    }
+
+    .order-list {
+      max-height: 220px;
+      overflow-y: auto;
+      margin: 10px 0;
+      padding-right: 4px;
+    }
+
+    .order-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+      font-size: 13.5px;
+    }
+
+    .order-row strong {
+      color: #34d399;
+    }
+
+    .order-row .line-total {
+      font-weight: 800;
+      color: #fbbf24;
+    }
+
+    .modal-total-box {
+      background: #1f2937;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 12px 0 16px;
+    }
+
+    .modal-total-box .total-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .modal-total-box .total-amount {
+      font-size: 20px;
+      font-weight: 900;
+      color: #fbbf24;
+    }
+
+    .btn-submit-order {
+      width: 100%;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      border: none;
+      padding: 15px;
+      font-size: 15px;
+      font-weight: 900;
+      border-radius: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    .btn-submit-order:active {
+      transform: scale(0.98);
+    }
+
+    .btn-whatsapp-fallback {
+      margin-top: 10px;
+      width: 100%;
+      background: #25D366;
+      color: #ffffff;
+      border: none;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 800;
+      border-radius: 12px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    /* Greetings Overlay */
+    .greetings-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 13, 22, 0.96);
+      backdrop-filter: blur(14px);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .greetings-overlay.active {
+      display: flex;
+    }
+
+    .party-icon {
+      font-size: 56px;
+      margin-bottom: 12px;
+      animation: bounce 1.4s infinite;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+
+    .stars {
+      color: #f59e0b;
+      font-size: 26px;
+      letter-spacing: 4px;
+      margin: 16px 0;
+    }
+
+    .btn-done {
+      background: var(--primary);
+      color: #064e3b;
+      border: none;
+      padding: 12px 28px;
+      font-size: 14px;
+      font-weight: 900;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-title">
+        70MM LOUNGE & BAR
+      </div>
+      <div class="brand-subtitle">
+        <span class="live-dot"></span> Live Table Ordering
+      </div>
+    </div>
+
+    <div class="table-badge">
+      <span class="tbl-num" id="headerTableNum">TABLE T1</span>
+      <span class="tbl-zone" id="headerTableZone">CLUB AREA</span>
+    </div>
+  </header>
+
+  <div class="main-wrap">
+    <!-- Real-time Active Order Status Banner -->
+    <div class="status-card" id="liveStatusBanner">
+      <div class="status-card-header">
+        <span class="status-tbl" id="statusTableInfo">Table T1 • Running Order</span>
+        <span class="status-pill status-cooking" id="statusBadge">COOKING 👨‍🍳</span>
+      </div>
+      <div class="status-info" id="statusMessage">
+        Order sent to the kitchen. Chef is preparing your delicious food & drinks!
+      </div>
+      <div class="status-bill" id="statusBillAmount">
+        Running Bill: ₹0.00
+      </div>
+      <button class="btn-checkout-req" id="btnRequestCheckout" onclick="handleRequestCheckout()">
+        🔔 Checkout / Complete Order
+      </button>
+    </div>
+
+    <!-- Search Box -->
+    <div class="search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" class="search-input" id="dishSearch" placeholder="Search starters, main course, cocktails..." oninput="handleSearch()">
+    </div>
+
+    <!-- Category Chips Carousel -->
+    <div class="cat-scroll" id="catChipsContainer">
+      <!-- Generated dynamically -->
+    </div>
+
+    <!-- Dish List Grid -->
+    <div class="menu-grid" id="menuGrid">
+      <!-- Dish cards rendered here -->
+    </div>
+  </div>
+
+  <!-- Floating Sticky Cart Bar -->
+  <div class="cart-float" id="cartFloatBar" onclick="openCartModal()">
+    <div class="cart-summary">
+      <span class="cart-items-count" id="cartItemsLabel">0 Items Selected</span>
+      <span class="cart-total-val" id="cartTotalLabel">₹0.00</span>
+    </div>
+    <button class="cart-action-btn">
+      View Order ➔
+    </button>
+  </div>
+
+  <!-- Cart / Checkout Modal Sheet -->
+  <div class="modal-overlay" id="checkoutModal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3 id="modalTableTitle">Table Order Details</h3>
+        <button class="btn-close" onclick="closeCartModal()">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Customer Name *</label>
+        <input type="text" class="form-input" id="custName" placeholder="Enter your full name" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">10-Digit Mobile Number *</label>
+        <input type="tel" class="form-input" id="custPhone" placeholder="Enter 10-digit mobile number" maxlength="10" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Special Cooking Instructions (Optional)</label>
+        <input type="text" class="form-input" id="custNotes" placeholder="e.g. Less spicy, extra lemon, no onions">
+      </div>
+
+      <label class="form-label" style="margin-top: 10px;">Selected Items:</label>
+      <div class="order-list" id="modalOrderItemsList"></div>
+
+      <div class="modal-total-box">
+        <span class="total-label">Grand Total Amount:</span>
+        <span class="total-amount" id="modalGrandTotal">₹0.00</span>
+      </div>
+
+      <button class="btn-submit-order" id="btnPlaceOrder" onclick="submitOrderToKitchen()">
+        Send Order to Kitchen 🚀
+      </button>
+
+      <button class="btn-whatsapp-fallback" id="btnWhatsAppFallback" onclick="sendViaWhatsApp()">
+        <span>📲 Send Order via WhatsApp (Direct to Manager)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Greetings / Bill Settlement Celebration Overlay -->
+  <div class="greetings-overlay" id="greetingsOverlay">
+    <div class="party-icon">🎉</div>
+    <h2 style="font-size: 24px; font-weight: 900; color: #ffffff; margin-bottom: 6px;">Thank You for Dining!</h2>
+    <p style="font-size: 15px; color: #34d399; font-weight: 800;" id="greetingsTable">Table Bill Settled Successfully</p>
+    <p style="font-size: 13px; color: #94a3b8; margin-top: 6px; max-width: 320px;">
+      Your payment was processed at the POS. We hope you had a fabulous time at 70MM Lounge!
+    </p>
+    <div class="stars">★★★★★</div>
+    <button class="btn-done" onclick="location.reload()">Start New Session</button>
+  </div>
+
+  <script>
+    // 1. Read URL Parameters (?table=T1&zone=VIP&host=192.168.1.15:8080)
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableNumber = urlParams.get('table') || 'T1';
+    const zone = decodeURIComponent(urlParams.get('zone') || 'Club Area');
+    const posHost = urlParams.get('host') || ''; // e.g. 192.168.1.15:8080
+
+    // Set Header Info
+    document.getElementById('headerTableNum').innerText = 'TABLE ' + tableNumber.toUpperCase();
+    document.getElementById('headerTableZone').innerText = zone.toUpperCase();
+    document.getElementById('modalTableTitle').innerText = 'Table ' + tableNumber + ' Order';
+
+    // 2. Default Full 70MM Lounge Products Catalog
+    const defaultProducts = [
+      // Starters
+      { id: 1, name: "Crispy Corn Salt & Pepper", category: "Starters", price: 220, isVeg: true, desc: "Golden fried sweet corn tossed with aromatic peppers and spring onions." },
+      { id: 2, name: "Paneer Tikka Angara", category: "Starters", price: 290, isVeg: true, desc: "Smoky tandoori cottage cheese cubes marinated in fiery tandoori spices." },
+      { id: 3, name: "Chicken Wings BBQ (6 pcs)", category: "Starters", price: 340, isVeg: false, desc: "Juicy glazed chicken wings tossed in rich smoky barbecue sauce." },
+      { id: 4, name: "Chilli Chicken Dry", category: "Starters", price: 320, isVeg: false, desc: "Crispy chicken tossed with bell peppers, green chillies & dark soy." },
+      { id: 5, name: "Crispy Veg Spring Rolls", category: "Starters", price: 190, isVeg: true, desc: "Crispy golden rolls stuffed with seasoned shredded vegetables." },
+      { id: 6, name: "Fish Amritsari Tikka", category: "Starters", price: 420, isVeg: false, desc: "Fresh fish fillets seasoned with carom seeds and crisp batter fried." },
+      { id: 7, name: "Loaded Cheese Nachos Deluxe", category: "Starters", price: 260, isVeg: true, desc: "Crunchy tortilla chips smothered in melted cheese, jalapenos and salsa." },
+      
+      // Main Course
+      { id: 10, name: "Dal Makhani 70MM Special", category: "Main Course", price: 280, isVeg: true, desc: "Slow-cooked black lentils simmered overnight with butter & cream." },
+      { id: 11, name: "Paneer Butter Masala", category: "Main Course", price: 310, isVeg: true, desc: "Soft cottage cheese simmered in a luscious rich tomato and cashew gravy." },
+      { id: 12, name: "Butter Chicken Boneless", category: "Main Course", price: 390, isVeg: false, desc: "Tandoori chicken cooked in rich velvety makhani gravy with butter." },
+      { id: 13, name: "Chicken Biryani with Raita", category: "Main Course", price: 360, isVeg: false, desc: "Aromatic basmati rice cooked with spiced chicken and fragrant saffron." },
+      { id: 14, name: "Veg Dum Biryani", category: "Main Course", price: 280, isVeg: true, desc: "Layered basmati rice with exotic fresh vegetables and mint aromatics." },
+      { id: 15, name: "Butter Naan (2 pcs)", category: "Main Course", price: 80, isVeg: true, desc: "Traditional tandoor-baked leavened bread brushed with rich butter." },
+      { id: 16, name: "Garlic Naan", category: "Main Course", price: 95, isVeg: true, desc: "Tandoori naan topped with roasted minced garlic and coriander." },
+      { id: 17, name: "Veg Hakka Noodles", category: "Main Course", price: 210, isVeg: true, desc: "Wok-tossed noodles with crisp seasonal vegetables and oriental spices." },
+      
+      // Cocktails & Drinks
+      { id: 20, name: "Classic Mint Mojito", category: "Drinks & Cocktails", price: 240, isVeg: true, desc: "Refreshing blend of fresh garden mint, lime wedges, sugar syrup and soda." },
+      { id: 21, name: "Long Island Iced Tea (LIIT)", category: "Drinks & Cocktails", price: 490, isVeg: true, desc: "High-octane mix of white spirits with lemon juice and a splash of cola." },
+      { id: 22, name: "Blue Lagoon Mocktail", category: "Drinks & Cocktails", price: 190, isVeg: true, desc: "Electric blue citrus blend topped with fizzy sprite and lemon." },
+      { id: 23, name: "Virgin Piña Colada", category: "Drinks & Cocktails", price: 210, isVeg: true, desc: "Creamy coconut cream shaken with fresh pineapple juice." },
+      { id: 24, name: "Corona Extra Beer (330ml)", category: "Drinks & Cocktails", price: 320, isVeg: true, desc: "Crisp imported Mexican lager served with fresh lime." },
+      { id: 25, name: "Kingfisher Ultra Pint", category: "Drinks & Cocktails", price: 220, isVeg: true, desc: "Smooth premium lager brewed from the finest malt and hops." },
+      { id: 26, name: "Red Bull Energy Drink", category: "Drinks & Cocktails", price: 160, isVeg: true, desc: "Chilled can of premium energy beverage." },
+      
+      // Lounge & Hookah Specials
+      { id: 30, name: "Royal Paan Special Hookah", category: "Lounge Specials", price: 750, isVeg: true, desc: "Signature sweet betel leaf blend with ice chilling base." },
+      { id: 31, name: "Mint Blast Ice Shisha", category: "Lounge Specials", price: 700, isVeg: true, desc: "Super refreshing frozen spearmint smoke with ice pipe." },
+      { id: 32, name: "Brain Freezer Exotic Hookah", category: "Lounge Specials", price: 850, isVeg: true, desc: "Exotic multi-flavour fusion chill for long-lasting lounge sessions." },
+
+      // Desserts
+      { id: 40, name: "Hot Gulab Jamun with Vanilla Ice Cream", category: "Desserts", price: 150, isVeg: true, desc: "Soft warm khoya dumplings served with cold vanilla scoop." },
+      { id: 41, name: "Sizzling Chocolate Brownie", category: "Desserts", price: 220, isVeg: true, desc: "Decadent chocolate brownie served on a hot sizzler plate with chocolate drizzle." }
+    ];
+
+    let products = [...defaultProducts];
+    let cart = {}; // productId -> quantity
+    let activeCategory = 'All';
+    let hasPlacedOrder = false;
+    let pollInterval = null;
+
+    // 3. Initialize & Fetch Live Menu if POS Host is Available
+    async function init() {
+      if (posHost) {
+        try {
+          const res = await fetch(`http://${posHost}/api/menu`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              products = data;
+            }
+          }
+        } catch (_err) {
+          console.log("Using built-in menu catalog.");
+        }
+      }
+
+      renderCategoryChips();
+      renderMenu();
+      startStatusPolling();
+    }
+
+    // 4. Render Category Filter Chips
+    function renderCategoryChips() {
+      const cats = ['All', ...new Set(products.map(p => p.category))];
+      const container = document.getElementById('catChipsContainer');
+      container.innerHTML = cats.map(c => 
+        '<div class="cat-chip ' + (c === activeCategory ? 'active' : '') + '" onclick="selectCategory(\'' + c + '\')">' + c + '</div>'
+      ).join('');
+    }
+
+    function selectCategory(cat) {
+      activeCategory = cat;
+      renderCategoryChips();
+      renderMenu();
+    }
+
+    function handleSearch() {
+      renderMenu();
+    }
+
+    // 5. Render Menu Dishes
+    function renderMenu() {
+      const query = document.getElementById('dishSearch').value.toLowerCase().trim();
+      const grid = document.getElementById('menuGrid');
+
+      const filtered = products.filter(p => {
+        const matchesCat = (activeCategory === 'All' || p.category === activeCategory);
+        const matchesSearch = (!query || p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
+        return matchesCat && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div style="text-align:center; padding: 40px; color: #64748b;">No dishes found matching your search.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(p => {
+        const qty = cart[p.id] || 0;
+        const isVeg = p.isVeg !== false;
+        const typeBadge = '<span class="type-pill">' + (isVeg ? '<span class="veg-dot"></span> Veg' : '<span class="nonveg-dot"></span> Non-Veg') + '</span>';
+
+        const actionHtml = qty === 0 
+          ? '<button class="btn-add" onclick="updateQty(' + p.id + ', 1)">+ Add</button>'
+          : '<div class="stepper">' +
+              '<button class="btn-step" onclick="updateQty(' + p.id + ', -1)">-</button>' +
+              '<span class="step-val">' + qty + '</span>' +
+              '<button class="btn-step" onclick="updateQty(' + p.id + ', 1)">+</button>' +
+            '</div>';
+
+        return '<div class="menu-card">' +
+          '<div class="card-left">' +
+            typeBadge +
+            '<div class="item-name">' + p.name + '</div>' +
+            '<div class="item-desc">' + (p.desc || p.category) + '</div>' +
+            '<div class="item-price">₹' + p.price.toFixed(2) + '</div>' +
+          '</div>' +
+          '<div>' + actionHtml + '</div>' +
+        '</div>';
+      }).join('');
+
+      updateCartBar();
+    }
+
+    // 6. Cart Quantity Management
+    function updateQty(id, delta) {
+      const curr = cart[id] || 0;
+      const next = curr + delta;
+      if (next <= 0) {
+        delete cart[id];
+      } else {
+        cart[id] = next;
+      }
+      renderMenu();
+    }
+
+    function updateCartBar() {
+      const items = Object.entries(cart);
+      const totalCount = items.reduce((sum, [_, q]) => sum + q, 0);
+      let totalAmount = 0;
+      items.forEach(([id, q]) => {
+        const prod = products.find(p => p.id == id);
+        if (prod) totalAmount += (prod.price * q);
+      });
+
+      const floatBar = document.getElementById('cartFloatBar');
+      if (totalCount > 0) {
+        floatBar.classList.add('show');
+        document.getElementById('cartItemsLabel').innerText = totalCount + (totalCount > 1 ? ' Items Selected' : ' Item Selected');
+        document.getElementById('cartTotalLabel').innerText = '₹' + totalAmount.toFixed(2);
+      } else {
+        floatBar.classList.remove('show');
+      }
+    }
+
+    // 7. Modal Handlers
+    function openCartModal() {
+      const list = document.getElementById('modalOrderItemsList');
+      const items = Object.entries(cart);
+      let totalAmount = 0;
+
+      list.innerHTML = items.map(([id, q]) => {
+        const prod = products.find(p => p.id == id);
+        if (!prod) return '';
+        const line = prod.price * q;
+        totalAmount += line;
+        return '<div class="order-row">' +
+          '<div><strong>' + q + 'x</strong> ' + prod.name + '</div>' +
+          '<div class="line-total">₹' + line.toFixed(2) + '</div>' +
+        '</div>';
+      }).join('');
+
+      document.getElementById('modalGrandTotal').innerText = '₹' + totalAmount.toFixed(2);
+      document.getElementById('checkoutModal').classList.add('open');
+    }
+
+    function closeCartModal() {
+      document.getElementById('checkoutModal').classList.remove('open');
+    }
+
+    // 8. Order Placement & Real-Time Sync with App
+    async function submitOrderToKitchen() {
+      const name = document.getElementById('custName').value.trim();
+      const phone = document.getElementById('custPhone').value.trim();
+      const notes = document.getElementById('custNotes').value.trim();
+
+      if (!name) {
+        alert("Please enter your name");
+        return;
+      }
+      if (!phone || phone.length < 10) {
+        alert("Please enter a valid 10-digit mobile number");
+        return;
+      }
+
+      const items = Object.entries(cart).map(([id, q]) => {
+        const prod = products.find(p => p.id == id);
+        return {
+          id: parseInt(id),
+          name: prod ? prod.name : 'Dish',
+          price: prod ? prod.price : 0,
+          quantity: q
+        };
+      });
+
+      if (items.length === 0) return;
+
+      const btn = document.getElementById('btnPlaceOrder');
+      btn.disabled = true;
+      btn.innerText = "Transmitting to Kitchen...";
+
+      const orderPayload = {
+        tableNumber: tableNumber,
+        zone: zone,
+        customerName: name,
+        customerPhone: phone,
+        notes: notes,
+        items: items
+      };
+
+      let directSuccess = false;
+
+      // Try sending directly to POS local server if host is supplied
+      if (posHost) {
+        try {
+          const res = await fetch(`http://${posHost}/api/order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderPayload)
+          });
+          const data = await res.json();
+          if (data && data.success) {
+            directSuccess = true;
+          }
+        } catch (_e) {
+          console.log("Local POS server direct fetch blocked or unreachable from HTTPS.");
+        }
+      }
+
+      // Mark order placed and show confirmation
+      hasPlacedOrder = true;
+      cart = {};
+      closeCartModal();
+      renderMenu();
+
+      const banner = document.getElementById('liveStatusBanner');
+      banner.classList.add('active');
+      document.getElementById('statusBadge').className = 'status-pill status-cooking';
+      document.getElementById('statusBadge').innerText = 'COOKING 👨‍🍳';
+      document.getElementById('statusMessage').innerText = 'Order placed for ' + name + ' (' + phone + '). Your food is freshly being prepared!';
+
+      // If on mobile HTTPS where mixed-content could restrict background calls, show WhatsApp one-tap confirmation
+      if (!directSuccess) {
+        document.getElementById('btnWhatsAppFallback').style.display = 'flex';
+      }
+
+      btn.disabled = false;
+      btn.innerText = "Send Order to Kitchen 🚀";
+    }
+
+    // 9. WhatsApp Instant Fallback Order to Manager (Phone: 8987477773)
+    function sendViaWhatsApp() {
+      const name = document.getElementById('custName').value.trim() || 'Guest';
+      const phone = document.getElementById('custPhone').value.trim() || '';
+      const notes = document.getElementById('custNotes').value.trim();
+
+      let text = `*New Table Self-Order — 70MM Lounge*\n` +
+        `📍 Table: ${tableNumber} (${zone})\n` +
+        `👤 Name: ${name} (${phone})\n` +
+        (notes ? `📝 Note: ${notes}\n` : '') +
+        `\n*Order Items:*\n`;
+
+      const list = document.querySelectorAll('#modalOrderItemsList .order-row');
+      list.forEach(r => {
+        text += `• ${r.innerText.replace('\n', ' - ')}\n`;
+      });
+      text += `\n*Total:* ${document.getElementById('modalGrandTotal').innerText}`;
+
+      const waUrl = `https://wa.me/918987477773?text=${encodeURIComponent(text)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    // 10. Customer "Checkout" Button Handling
+    async function handleRequestCheckout() {
+      const btn = document.getElementById('btnRequestCheckout');
+      btn.disabled = true;
+      btn.innerText = "Requesting Checkout...";
+
+      if (posHost) {
+        try {
+          await fetch(`http://${posHost}/api/request-checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableNumber: tableNumber })
+          });
+        } catch (_err) {}
+      }
+
+      btn.className = 'btn-checkout-req requested';
+      btn.innerText = '🔔 Checkout Requested ⏳ Cashier Notified';
+    }
+
+    // 11. Real-time Status Polling
+    function startStatusPolling() {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        if (!posHost) return;
+        try {
+          const res = await fetch(`http://${posHost}/api/table-status?table=${encodeURIComponent(tableNumber)}`);
+          if (!res.ok) return;
+          const data = await res.json();
+
+          const banner = document.getElementById('liveStatusBanner');
+          const badge = document.getElementById('statusBadge');
+          const msg = document.getElementById('statusMessage');
+          const billEl = document.getElementById('statusBillAmount');
+          const checkoutBtn = document.getElementById('btnRequestCheckout');
+
+          if (data.status === 'OCCUPIED' || data.status === 'CHECKOUT_REQUESTED' || hasPlacedOrder) {
+            banner.classList.add('active');
+            if (data.billAmount > 0) {
+              billEl.innerText = 'Current Running Bill: ₹' + data.billAmount.toFixed(2);
+            }
+
+            if (data.kotStatus === 'READY' || data.kotStatus === 'SERVED') {
+              badge.className = 'status-pill status-ready';
+              badge.innerText = 'SERVED / READY 🍽️';
+              msg.innerText = 'Your food & drinks are served to your table. Enjoy your time at 70MM Lounge!';
+            } else {
+              badge.className = 'status-pill status-cooking';
+              badge.innerText = 'COOKING 👨‍🍳';
+              msg.innerText = 'Your order is being freshly prepared in the kitchen.';
+            }
+
+            if (data.isCheckoutRequested) {
+              checkoutBtn.className = 'btn-checkout-req requested';
+              checkoutBtn.innerText = '🔔 Checkout Requested ⏳ Cashier Notified';
+            }
+          }
+
+          // If bill settled / table freed at POS
+          if (hasPlacedOrder && (data.status === 'AVAILABLE' || data.status === 'BILLED')) {
+            clearInterval(pollInterval);
+            document.getElementById('greetingsTable').innerText = 'Table ' + tableNumber + ' Bill Settled Successfully';
+            document.getElementById('greetingsOverlay').classList.add('active');
+          }
+        } catch (_err) {}
+      }, 3000);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

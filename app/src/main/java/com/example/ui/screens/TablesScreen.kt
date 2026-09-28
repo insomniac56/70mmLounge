@@ -861,13 +861,13 @@ fun TableQrStandeeDialog(
     onSimulateScan: () -> Unit
 ) {
     val context = LocalContext.current
-    var urlMode by remember { mutableStateOf(1) } // 0: Web Domain, 1: Local WiFi IP, 2: App Deep-Link
+    var urlMode by remember { mutableStateOf(0) } // 0: Vercel Web Domain, 1: Local WiFi IP, 2: App Deep-Link
 
     val localIp = remember { CustomerHttpServer.getLocalIpAddress() }
     val localPort = remember { CustomerHttpServer.getPort() }
 
     val dynamicWebUrl = remember(table.tableNumber, table.zone) {
-        TableUrlGenerator.createDynamicTableUrl(table.tableNumber, table.zone, "https://order.70mmlounge.club")
+        TableUrlGenerator.createDynamicTableUrl(table.tableNumber, table.zone)
     }
     val dynamicLocalUrl = remember(table.tableNumber, table.zone, localIp, localPort) {
         "http://$localIp:$localPort/order?table=${table.tableNumber.trim()}&zone=${table.zone.trim()}"
@@ -924,7 +924,7 @@ fun TableQrStandeeDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val modes = listOf("Cloud Web", "Local WiFi", "App Link")
+                    val modes = listOf("Vercel Web", "Local WiFi", "App Link")
                     modes.forEachIndexed { idx, label ->
                         val isSelected = (urlMode == idx)
                         FilterChip(

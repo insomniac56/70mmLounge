@@ -81,6 +81,7 @@ import com.example.ui.screens.OrdersHistoryScreen
 import com.example.ui.screens.PosCheckoutScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.TablesScreen
+import com.example.ui.theme.Amber500
 import com.example.ui.theme.Emerald50
 import com.example.ui.theme.Emerald600
 import com.example.ui.theme.RetailPosTheme
@@ -151,6 +152,7 @@ fun MainAppScaffold(viewModel: PosViewModel) {
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val cartItems by viewModel.cartItems.collectAsStateWithLifecycle()
     val activeKots by viewModel.activeKots.collectAsStateWithLifecycle()
+    val allTables by viewModel.allTables.collectAsStateWithLifecycle()
     val lastCompletedOrder by viewModel.lastCompletedOrder.collectAsStateWithLifecycle()
     val activeCustomerTable by viewModel.activeCustomerTable.collectAsStateWithLifecycle()
     val lowStockProducts by viewModel.lowStockProducts.collectAsStateWithLifecycle()
@@ -158,6 +160,7 @@ fun MainAppScaffold(viewModel: PosViewModel) {
 
     val cartCount = cartItems.sumOf { it.quantity }
     val prepKotsCount = activeKots.count { it.status == "NEW" || it.status == "PREPARING" }
+    val activeTablesCount = allTables.count { it.isOccupied || it.status == "CHECKOUT_REQUESTED" || it.currentBillAmount > 0 }
     val lowStockCount = lowStockProducts.size
 
     // If customer order mode is open for a table, display CustomerOrderScreen
@@ -328,6 +331,21 @@ fun MainAppScaffold(viewModel: PosViewModel) {
                                             badge = {
                                                 Badge(containerColor = Emerald600, contentColor = Color.White) {
                                                     Text("$cartCount")
+                                                }
+                                            }
+                                        ) {
+                                            Icon(destination.icon, contentDescription = destination.title, modifier = Modifier.size(24.dp))
+                                        }
+                                    } else {
+                                        Icon(destination.icon, contentDescription = destination.title, modifier = Modifier.size(24.dp))
+                                    }
+                                }
+                                PosNavDestination.TABLES -> {
+                                    if (activeTablesCount > 0) {
+                                        BadgedBox(
+                                            badge = {
+                                                Badge(containerColor = Amber500, contentColor = Color.White) {
+                                                    Text("$activeTablesCount")
                                                 }
                                             }
                                         ) {

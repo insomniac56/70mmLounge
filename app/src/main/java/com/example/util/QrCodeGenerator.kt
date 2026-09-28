@@ -52,7 +52,7 @@ import java.net.NetworkInterface
  */
 object TableUrlGenerator {
 
-    const val DEFAULT_WEB_DOMAIN = "https://order.70mmlounge.club"
+    const val DEFAULT_WEB_DOMAIN = "https://70mmlounge.vercel.app/pos-menu.html"
     const val RESTAURANT_NAME = "70mm Lounge"
     const val RESTAURANT_PHONE = "8987477773"
     const val RESTAURANT_EMAIL = "70mmlounge8bokaro@gmail.com"
@@ -90,7 +90,7 @@ object TableUrlGenerator {
 
     /**
      * Generates a scannable HTTP URL that opens the customer web ordering menu.
-     * Works across any phone on the local Wi-Fi or Hotspot network.
+     * Uses the Vercel hosted URL with table parameters and POS host info.
      */
     fun createDynamicTableUrl(
         tableNumber: String,
@@ -102,14 +102,15 @@ object TableUrlGenerator {
         val cleanZone = zone.trim().ifBlank { "Club area" }
         val encodedZone = urlEncode(cleanZone)
         val encodedClub = urlEncode(RESTAURANT_NAME)
+        val ip = getDeviceIpAddress()
+        val port = CustomerHttpServer.getPort()
 
-        // If a specific custom web domain was requested that is not the default, use it
-        return if (baseDomain.isNotBlank() && baseDomain != DEFAULT_WEB_DOMAIN && !baseDomain.contains("192.168") && !baseDomain.contains(":8080")) {
+        return if (baseDomain.contains("vercel.app") || baseDomain == DEFAULT_WEB_DOMAIN) {
+            "https://70mmlounge.vercel.app/pos-menu.html?table=$cleanTable&zone=$encodedZone&club=$encodedClub&host=$ip:$port"
+        } else if (baseDomain.isNotBlank() && !baseDomain.contains("192.168") && !baseDomain.contains(":8080")) {
             val domain = baseDomain.trimEnd('/')
-            "$domain/order?table=$cleanTable&zone=$encodedZone&club=$encodedClub"
+            "$domain/pos-menu.html?table=$cleanTable&zone=$encodedZone&club=$encodedClub&host=$ip:$port"
         } else {
-            val ip = getDeviceIpAddress()
-            val port = CustomerHttpServer.getPort()
             "http://$ip:$port/order?table=$cleanTable&zone=$encodedZone&club=$encodedClub"
         }
     }
