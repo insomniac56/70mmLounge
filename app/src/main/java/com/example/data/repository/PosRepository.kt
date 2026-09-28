@@ -63,9 +63,23 @@ class PosRepository(private val dao: PosDao) {
         dao.clearAllRunningTables()
     }
 
+    suspend fun getTableByNumber(tableNumber: String): RestaurantTable? {
+        return dao.getTableByNumber(tableNumber)
+    }
+
     suspend fun updateTableStatus(tableId: Long, status: String, guestName: String, billAmount: Double) {
         dao.updateTableStatus(tableId, status, guestName, billAmount)
     }
+
+    suspend fun requestTableCheckout(tableNumber: String) {
+        dao.requestTableCheckout(tableNumber)
+    }
+
+    fun getTableByNumberFlow(tableNumber: String): Flow<RestaurantTable?> =
+        dao.getTableByNumberFlow(tableNumber)
+
+    fun getLatestKotForTable(tableNumber: String): Flow<KitchenOrderTicket?> =
+        dao.getLatestKotForTable(tableNumber)
 
     suspend fun vacateTable(tableId: Long) {
         dao.vacateTable(tableId)
@@ -73,6 +87,10 @@ class PosRepository(private val dao: PosDao) {
 
     suspend fun updateKotStatus(kotId: Long, newStatus: String) {
         dao.updateKotStatus(kotId, newStatus)
+    }
+
+    suspend fun updateKot(kot: KitchenOrderTicket) {
+        dao.updateKot(kot)
     }
 
     suspend fun updateKotCompletedItems(kotId: Long, completedItems: String) {

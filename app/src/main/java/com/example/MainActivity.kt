@@ -92,6 +92,7 @@ import com.example.ui.theme.Slate700
 import com.example.ui.theme.Slate800
 import com.example.ui.theme.Slate900
 import com.example.ui.viewmodel.PosViewModel
+import com.example.util.CustomerHttpServer
 
 enum class PosNavDestination(
     val title: String,
@@ -99,8 +100,8 @@ enum class PosNavDestination(
     val testTag: String
 ) {
     POS("POS", Icons.Default.PointOfSale, "nav_pos"),
-    TABLES("Tables & QR", Icons.Default.TableBar, "nav_tables"),
-    KITCHEN("Kitchen KOT", Icons.Default.SoupKitchen, "nav_kitchen"),
+    TABLES("Tables", Icons.Default.TableBar, "nav_tables"),
+    KITCHEN("Kitchen", Icons.Default.SoupKitchen, "nav_kitchen"),
     REPORTS("Reports", Icons.Default.Assessment, "nav_reports"),
     INVOICES("Invoices", Icons.AutoMirrored.Filled.ReceiptLong, "nav_invoices")
 }
@@ -113,6 +114,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleIncomingIntent(intent)
+        CustomerHttpServer.start(this, viewModel.repository)
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             RetailPosTheme(darkTheme = isDarkMode) {
@@ -358,7 +360,10 @@ fun MainAppScaffold(viewModel: PosViewModel) {
                         label = {
                             Text(
                                 text = destination.title,
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             )
                         },

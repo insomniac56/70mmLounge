@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,10 +39,13 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -99,6 +103,7 @@ import com.example.ui.theme.Slate800
 import com.example.ui.theme.Slate900
 import com.example.ui.viewmodel.PosViewModel
 import com.example.util.CurrencyFormatter
+import com.example.util.CustomerHttpServer
 import com.example.util.QrCodeGenerator
 import com.example.util.TableQrCodeView
 import com.example.util.TableUrlGenerator
@@ -453,6 +458,7 @@ fun TablesScreen(
                         table = table,
                         isDarkMode = isDarkMode,
                         onViewQr = { viewModel.openTableQr(table) },
+                        onOpenCustomerMenu = { onNavigateToCustomerOrder(table) },
                         onDelete = { viewModel.deleteTable(table.tableId) },
                         onSettleBill = { onNavigateToCheckout(table) },
                         onVacate = { viewModel.vacateTable(table.tableId) }
@@ -504,41 +510,51 @@ private fun RestaurantTableCard(
     table: RestaurantTable,
     isDarkMode: Boolean,
     onViewQr: () -> Unit,
+    onOpenCustomerMenu: () -> Unit,
     onDelete: () -> Unit,
     onSettleBill: () -> Unit,
     onVacate: () -> Unit
 ) {
     val context = LocalContext.current
+    val isReq = table.isCheckoutRequested
     val isRunning = table.isOccupied || table.currentBillAmount > 0
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    // Visual indicators: Green for Available, Yellow for Running
-    val cardBg = if (isRunning) {
+    // Visual indicators: Green for Available, Yellow for Running, Amber for Checkout Requested
+    val cardBg = if (isReq) {
+        if (isDarkMode) Color(0xFF332009) else Color(0xFFFEF3C7)
+    } else if (isRunning) {
         if (isDarkMode) Color(0xFF2B200C) else Color(0xFFFFFBEB)
     } else {
         if (isDarkMode) Color(0xFF0F261B) else Color(0xFFF0FDF4)
     }
 
-    val cardBorderColor = if (isRunning) {
+    val cardBorderColor = if (isReq) {
+        Color(0xFFD97706)
+    } else if (isRunning) {
         Color(0xFFF59E0B) // Bright Running Yellow/Amber border
     } else {
         Color(0xFF22C55E) // Crisp Available Green border
     }
 
-    val statusPillBg = if (isRunning) {
+    val statusPillBg = if (isReq) {
+        Color(0xFFD97706)
+    } else if (isRunning) {
         if (isDarkMode) Color(0xFF78350F) else Color(0xFFFEF3C7)
     } else {
         if (isDarkMode) Color(0xFF14532D) else Color(0xFFDCFCE7)
     }
 
-    val statusPillText = if (isRunning) {
+    val statusPillText = if (isReq) {
+        Color.White
+    } else if (isRunning) {
         if (isDarkMode) Color(0xFFFDE68A) else Color(0xFFB45309)
     } else {
         if (isDarkMode) Color(0xFF86EFAC) else Color(0xFF15803D)
     }
 
-    val statusLabel = if (isRunning) "🟡 RUNNING" else "🟢 AVAILABLE"
-    val accentBarColor = if (isRunning) Color(0xFFF59E0B) else Color(0xFF22C55E)
+    val statusLabel = if (isReq) "🔔 COMPLETE ORDER" else if (isRunning) "🟡 RUNNING" else "🟢 AVAILABLE"
+    val accentBarColor = if (isReq) Color(0xFFD97706) else if (isRunning) Color(0xFFF59E0B) else Color(0xFF22C55E)
 
     Card(
         modifier = Modifier
@@ -687,12 +703,28 @@ private fun RestaurantTableCard(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Action Buttons
+                // Action Buttons: Customer Menu, View QR Standee, Delete
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Customer Menu in-app button
+                    Button(
+                        onClick = onOpenCustomerMenu,
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .height(34.dp)
+                            .testTag("customer_menu_button_${table.tableNumber}"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Customer Menu", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                    }
+
                     // Table QR Standee button
                     OutlinedButton(
                         onClick = onViewQr,
@@ -704,42 +736,9 @@ private fun RestaurantTableCard(
                         contentPadding = PaddingValues(horizontal = 4.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, cardBorderColor.copy(alpha = 0.5f))
                     ) {
-                        Icon(Icons.Default.QrCode2, contentDescription = "QR Code", modifier = Modifier.size(15.dp))
+                        Icon(Icons.Default.QrCode2, contentDescription = "QR Code", modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(3.dp))
-                        Text("QR View", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    // Direct Download Standee Image Button
-                    Button(
-                        onClick = {
-                            val url = TableUrlGenerator.createDynamicTableUrl(table.tableNumber, table.zone)
-                            QrCodeGenerator.downloadTableQrStandee(context, table, url)
-                            Toast.makeText(context, "Table ${table.tableNumber} QR Standee Downloaded!", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier
-                            .weight(1.1f)
-                            .height(34.dp)
-                            .testTag("download_qr_${table.tableNumber}"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRunning) Color(0xFFFEF3C7) else Color(0xFFDCFCE7),
-                            contentColor = if (isRunning) Color(0xFFB45309) else Color(0xFF15803D)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = "Download Table QR Standee",
-                            tint = if (isRunning) Color(0xFFB45309) else Color(0xFF15803D),
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text(
-                            "Download",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isRunning) Color(0xFFB45309) else Color(0xFF15803D)
-                        )
+                        Text("QR Standee", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     }
 
                     // Delete Table Button
@@ -762,27 +761,13 @@ private fun RestaurantTableCard(
 
                 if (isRunning) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = onVacate,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(32.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(0.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
-                        ) {
-                            Text("Vacate", fontSize = 11.sp, color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFFB45309))
-                        }
-
+                    if (isReq) {
                         Button(
                             onClick = onSettleBill,
                             modifier = Modifier
-                                .weight(1.2f)
-                                .height(32.dp),
+                                .fillMaxWidth()
+                                .height(34.dp)
+                                .testTag("complete_order_button_${table.tableNumber}"),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFD97706),
@@ -790,7 +775,41 @@ private fun RestaurantTableCard(
                             ),
                             contentPadding = PaddingValues(0.dp)
                         ) {
-                            Text("Settle Bill", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Complete Order 🔔", fontSize = 11.5.sp, fontWeight = FontWeight.Black)
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = onVacate,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(32.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
+                            ) {
+                                Text("Vacate", fontSize = 11.sp, color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFFB45309))
+                            }
+
+                            Button(
+                                onClick = onSettleBill,
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .height(32.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFFD97706),
+                                    contentColor = Color.White
+                                ),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text("Settle Bill", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -842,13 +861,16 @@ fun TableQrStandeeDialog(
     onSimulateScan: () -> Unit
 ) {
     val context = LocalContext.current
-    var urlMode by remember { mutableStateOf(0) } // 0: Web Domain, 1: Local WiFi IP, 2: App Deep-Link
+    var urlMode by remember { mutableStateOf(1) } // 0: Web Domain, 1: Local WiFi IP, 2: App Deep-Link
+
+    val localIp = remember { CustomerHttpServer.getLocalIpAddress() }
+    val localPort = remember { CustomerHttpServer.getPort() }
 
     val dynamicWebUrl = remember(table.tableNumber, table.zone) {
         TableUrlGenerator.createDynamicTableUrl(table.tableNumber, table.zone, "https://order.70mmlounge.club")
     }
-    val dynamicLocalUrl = remember(table.tableNumber, table.zone) {
-        TableUrlGenerator.createDynamicTableUrl(table.tableNumber, table.zone, "http://192.168.1.100:8080")
+    val dynamicLocalUrl = remember(table.tableNumber, table.zone, localIp, localPort) {
+        "http://$localIp:$localPort/order?table=${table.tableNumber.trim()}&zone=${table.zone.trim()}"
     }
     val deepLinkUrl = remember(table.tableNumber, table.zone) {
         TableUrlGenerator.createTableDeepLink(table.tableNumber, table.zone)
@@ -1074,7 +1096,29 @@ fun TableQrStandeeDialog(
                     ) {
                         Icon(Icons.Default.QrCode2, contentDescription = null)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Simulate Customer QR Scan & Order")
+                        Text("Open In-App Customer Menu")
+                    }
+
+                    Button(
+                        onClick = {
+                            try {
+                                val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(activeUrl)).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(browserIntent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open browser: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_menu_in_browser_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Sky600),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Open Web Menu in Browser (Chrome)", fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(

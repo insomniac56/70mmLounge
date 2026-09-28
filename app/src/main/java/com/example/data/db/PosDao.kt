@@ -80,6 +80,12 @@ interface PosDao {
     @Query("UPDATE restaurant_tables SET status = :status, currentGuestName = :guestName, currentBillAmount = :billAmount WHERE tableId = :tableId")
     suspend fun updateTableStatus(tableId: Long, status: String, guestName: String, billAmount: Double)
 
+    @Query("UPDATE restaurant_tables SET status = 'CHECKOUT_REQUESTED' WHERE tableNumber = :tableNumber")
+    suspend fun requestTableCheckout(tableNumber: String)
+
+    @Query("SELECT * FROM restaurant_tables WHERE tableNumber = :tableNumber LIMIT 1")
+    fun getTableByNumberFlow(tableNumber: String): Flow<RestaurantTable?>
+
     @Query("UPDATE restaurant_tables SET status = 'AVAILABLE', currentGuestName = '', currentBillAmount = 0.0, activeOrderId = NULL WHERE tableId = :tableId")
     suspend fun vacateTable(tableId: Long)
 
@@ -90,6 +96,9 @@ interface PosDao {
     @Query("SELECT * FROM kitchen_order_tickets ORDER BY timestamp DESC")
     fun getAllKots(): Flow<List<KitchenOrderTicket>>
 
+    @Query("SELECT * FROM kitchen_order_tickets WHERE tableNumber = :tableNumber ORDER BY timestamp DESC LIMIT 1")
+    fun getLatestKotForTable(tableNumber: String): Flow<KitchenOrderTicket?>
+
     @Query("SELECT * FROM kitchen_order_tickets WHERE status != 'SERVED' ORDER BY timestamp DESC")
     fun getActiveKots(): Flow<List<KitchenOrderTicket>>
 
@@ -98,6 +107,12 @@ interface PosDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAllKots(kots: List<KitchenOrderTicket>)
+
+    @Update
+    suspend fun updateKot(kot: KitchenOrderTicket)
+
+    @Query("UPDATE kitchen_order_tickets SET itemsSummary = :itemsSummary WHERE kotId = :kotId")
+    suspend fun updateKotItemsSummary(kotId: Long, itemsSummary: String)
 
     @Query("UPDATE kitchen_order_tickets SET status = :newStatus WHERE kotId = :kotId")
     suspend fun updateKotStatus(kotId: Long, newStatus: String)

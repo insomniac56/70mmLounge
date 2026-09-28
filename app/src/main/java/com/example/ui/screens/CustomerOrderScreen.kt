@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.LocalBar
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
@@ -66,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -138,7 +140,23 @@ fun CustomerOrderScreen(
     val totalCartCount = cartItems.sumOf { it.quantity }
     val cartGrandTotal = cartItems.sumOf { it.totalAmount }
 
-    if (isOrderPlaced) {
+    val allTables by viewModel.allTables.collectAsStateWithLifecycle()
+    val allKots by viewModel.allKots.collectAsStateWithLifecycle()
+    val liveTable = allTables.find { it.tableNumber.equals(table.tableNumber, ignoreCase = true) } ?: table
+    val latestKot = allKots.firstOrNull { it.tableNumber.equals(table.tableNumber, ignoreCase = true) && it.status != "CANCELLED" }
+
+    var hasPlacedOrderThisSession by remember { mutableStateOf(false) }
+    var initialWasOccupied by remember { mutableStateOf(table.isOccupied) }
+
+    LaunchedEffect(isOrderPlaced) {
+        if (isOrderPlaced) {
+            hasPlacedOrderThisSession = true
+        }
+    }
+
+    val isBillingCompleted = (hasPlacedOrderThisSession || initialWasOccupied) && liveTable.isAvailable
+
+    if (isBillingCompleted) {
         val context = LocalContext.current
         var rating by remember { mutableStateOf(5) }
         var selectedFeedbackTags by remember { mutableStateOf(setOf("Delicious Food 🍲", "Great Drinks 🍸")) }
@@ -195,7 +213,7 @@ fun CustomerOrderScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Order Placed & Sent to Kitchen! 🎉",
+                        text = "Thank You for Dining at 70MM Lounge! 🎉",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -205,7 +223,7 @@ fun CustomerOrderScreen(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Table ${table.tableNumber} • ${table.zone} is ACTIVE in POS",
+                        text = "Table ${liveTable.tableNumber} • ${liveTable.zone} Bill Completed & Settled",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = Emerald600,
@@ -213,7 +231,7 @@ fun CustomerOrderScreen(
                     )
 
                     Text(
-                        text = "Food & drinks are being prepared and will be served directly to your table.",
+                        text = "Your table bill has been processed at POS. We hope you had a fantastic time!",
                         style = MaterialTheme.typography.bodySmall,
                         color = Slate500,
                         textAlign = TextAlign.Center,
@@ -636,6 +654,125 @@ fun CustomerOrderScreen(
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
+
+                // Live Table Status & Order Status Banner (Visible when order placed or table is occupied)
+                if (liveTable.isOccupied || hasPlacedOrderThisSession) {
+                    val isReady = latestKot?.status == "READY" || latestKot?.status == "SERVED"
+                    val isReq = liveTable.isCheckoutRequested
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(
+                                1.5.dp,
+                                if (isReq) Color(0xFFF59E0B) else if (isReady) Emerald600 else Color(0xFF0284C7),
+                                RoundedCornerShape(12.dp)
+                            ),
+                        color = if (isReq) Color(0xFFFEF3C7).copy(alpha = 0.6f)
+                                else if (isReady) Emerald50
+                                else Color(0xFFE0F2FE).copy(alpha = 0.6f)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isReq) Color(0xFFF59E0B) else if (isReady) Emerald600 else Color(0xFF0284C7))
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Table ${liveTable.tableNumber} • ${liveTable.zone}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = Slate900
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isReq) Color(0xFFF59E0B) else if (isReady) Emerald600 else Color(0xFF0284C7)
+                                ) {
+                                    Text(
+                                        text = if (isReq) "BILLING REQUESTED ⏳"
+                                               else if (isReady) "ORDER READY / SERVED 🍽️"
+                                               else "COOKING IN KITCHEN 👨‍🍳",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val displayGuest = liveTable.currentGuestName.ifBlank { guestName.ifBlank { "Table Guest" } }
+                            Text(
+                                text = "Guest: $displayGuest • Running Bill: ₹${String.format("%.2f", liveTable.currentBillAmount)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Slate700
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // "Checkout" Button as requested by user
+                            if (!isReq) {
+                                Button(
+                                    onClick = {
+                                        viewModel.requestTableCheckout(liveTable.tableNumber)
+                                        Toast.makeText(context, "Checkout requested! POS cashier will bill Table ${liveTable.tableNumber}.", Toast.LENGTH_LONG).show()
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(38.dp)
+                                        .testTag("customer_request_checkout_button"),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFD97706),
+                                        contentColor = Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(Icons.Default.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Checkout", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                }
+                            } else {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(36.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.2f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "🔔 Checkout Requested • Complete Order in POS",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFB45309)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
 
                 // Guest Name & Mobile Number (Mandatory to send order)
                 Row(

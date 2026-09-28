@@ -39,6 +39,13 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import kotlin.math.abs
 
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import java.net.Inet4Address
+import java.net.NetworkInterface
+
 /**
  * Utility for dynamically generating unique, tamper-evident customer self-ordering URLs
  * and rendering scannable QR matrices for each restaurant & club table.
@@ -59,9 +66,31 @@ object TableUrlGenerator {
     }
 
     /**
-     * Dynamically creates a unique URL for a restaurant table.
-     * Contains table number, zone, venue information, and a cryptographic session signature
-     * to facilitate secure customer self-ordering.
+     * Resolves the device's local LAN or Wi-Fi / Hotspot IPv4 address.
+     */
+    fun getDeviceIpAddress(): String {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val iface = interfaces.nextElement()
+                val addrs = iface.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                        val ip = addr.hostAddress ?: ""
+                        if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.")) {
+                            return ip
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+        return "192.168.1.100"
+    }
+
+    /**
+     * Generates a scannable HTTP URL that opens the customer web ordering menu.
+     * Works across any phone on the local Wi-Fi or Hotspot network.
      */
     fun createDynamicTableUrl(
         tableNumber: String,
@@ -71,11 +100,18 @@ object TableUrlGenerator {
     ): String {
         val cleanTable = tableNumber.trim()
         val cleanZone = zone.trim().ifBlank { "Club area" }
-        val token = generateTableToken(cleanTable, cleanZone, salt)
         val encodedZone = urlEncode(cleanZone)
         val encodedClub = urlEncode(RESTAURANT_NAME)
 
-        return "$baseDomain/order?table=$cleanTable&zone=$encodedZone&club=$encodedClub&phone=$RESTAURANT_PHONE&token=$token"
+        // If a specific custom web domain was requested that is not the default, use it
+        return if (baseDomain.isNotBlank() && baseDomain != DEFAULT_WEB_DOMAIN && !baseDomain.contains("192.168") && !baseDomain.contains(":8080")) {
+            val domain = baseDomain.trimEnd('/')
+            "$domain/order?table=$cleanTable&zone=$encodedZone&club=$encodedClub"
+        } else {
+            val ip = getDeviceIpAddress()
+            val port = CustomerHttpServer.getPort()
+            "http://$ip:$port/order?table=$cleanTable&zone=$encodedZone&club=$encodedClub"
+        }
     }
 
     /**
@@ -110,99 +146,31 @@ object TableUrlGenerator {
  */
 object QrCodeGenerator {
 
-    fun generateQrMatrix(data: String, size: Int = 25): Array<BooleanArray> {
-        val matrix = Array(size) { BooleanArray(size) { false } }
+    /**
+     * Generates a 100% ISO-standard scannable QR Code boolean matrix using ZXing.
+     * Can be scanned by any smartphone camera (Google Lens, Apple Camera, Samsung, Xiaomi, etc.)
+     */
+    fun generateQrMatrix(data: String, minSize: Int = 29): Array<BooleanArray> {
+        return try {
+            val hints = HashMap<EncodeHintType, Any>()
+            hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.M
+            hints[EncodeHintType.MARGIN] = 1
+            hints[EncodeHintType.CHARACTER_SET] = "UTF-8"
 
-        // 1. Draw 3 Finder Patterns (Top-Left, Top-Right, Bottom-Left)
-        drawFinderPattern(matrix, 0, 0)
-        drawFinderPattern(matrix, size - 7, 0)
-        drawFinderPattern(matrix, 0, size - 7)
-
-        // 2. Timing Patterns
-        for (i in 8 until size - 8) {
-            val bit = (i % 2 == 0)
-            matrix[6][i] = bit
-            matrix[i][6] = bit
-        }
-
-        // 3. Encode data deterministically into the remaining modules using hash & bytes
-        val bytes = data.toByteArray(Charsets.UTF_8)
-        var bitIndex = 0
-        val hash = abs(data.hashCode())
-
-        for (col in (size - 1) downTo 0 step 2) {
-            val c = if (col <= 6) col - 1 else col
-            if (c < 0) continue
-
-            for (row in 0 until size) {
-                val r = if ((col / 2) % 2 == 0) row else (size - 1 - row)
-
-                for (subCol in 0..1) {
-                    val currCol = c - subCol
-                    if (currCol < 0) continue
-
-                    // Skip finder patterns & timing
-                    if (isFunctionPattern(currCol, r, size)) continue
-
-                    val byteVal = if (bytes.isNotEmpty()) bytes[bitIndex % bytes.size].toInt() else 0
-                    val pseudoBit = ((byteVal shr (bitIndex % 8)) and 1) == 1
-                    val hashBit = ((hash shr ((bitIndex + r + currCol) % 31)) and 1) == 1
-
-                    // Masking pattern (r + currCol) % 2 == 0
-                    val mask = (r + currCol) % 2 == 0
-                    matrix[r][currCol] = (pseudoBit xor hashBit xor mask)
-                    bitIndex++
+            val bitMatrix = QRCodeWriter().encode(data, BarcodeFormat.QR_CODE, 0, 0, hints)
+            val w = bitMatrix.width
+            val h = bitMatrix.height
+            val matrix = Array(h) { BooleanArray(w) }
+            for (y in 0 until h) {
+                for (x in 0 until w) {
+                    matrix[y][x] = bitMatrix.get(x, y)
                 }
             }
+            matrix
+        } catch (e: Exception) {
+            // Fallback safe minimum matrix
+            Array(25) { BooleanArray(25) }
         }
-
-        // Ensure Alignment Pattern for size >= 25 (centered at (size-7, size-7))
-        if (size >= 25) {
-            drawAlignmentPattern(matrix, size - 7, size - 7)
-        }
-
-        return matrix
-    }
-
-    private fun drawFinderPattern(matrix: Array<BooleanArray>, startRow: Int, startCol: Int) {
-        for (r in 0 until 7) {
-            for (c in 0 until 7) {
-                val isOuter = (r == 0 || r == 6 || c == 0 || c == 6)
-                val isInner = (r in 2..4 && c in 2..4)
-                matrix[startRow + r][startCol + c] = isOuter || isInner
-            }
-        }
-        // Separator ring
-        for (r in -1..7) {
-            for (c in -1..7) {
-                val row = startRow + r
-                val col = startCol + c
-                if (row in matrix.indices && col in matrix[0].indices) {
-                    if (r == -1 || r == 7 || c == -1 || c == 7) {
-                        matrix[row][col] = false
-                    }
-                }
-            }
-        }
-    }
-
-    private fun drawAlignmentPattern(matrix: Array<BooleanArray>, centerRow: Int, centerCol: Int) {
-        for (r in -2..2) {
-            for (c in -2..2) {
-                val isOuter = (abs(r) == 2 || abs(c) == 2)
-                val isCenter = (r == 0 && c == 0)
-                matrix[centerRow + r][centerCol + c] = isOuter || isCenter
-            }
-        }
-    }
-
-    private fun isFunctionPattern(col: Int, row: Int, size: Int): Boolean {
-        if (row in 0..8 && col in 0..8) return true
-        if (row in 0..8 && col in (size - 8) until size) return true
-        if (row in (size - 8) until size && col in 0..8) return true
-        if (row == 6 || col == 6) return true
-        if (size >= 25 && row in (size - 9)..(size - 5) && col in (size - 9)..(size - 5)) return true
-        return false
     }
 
     /**
@@ -261,21 +229,24 @@ object QrCodeGenerator {
         val qrSize = 460
         val qrLeft = (width - qrSize) / 2
         val qrTop = 310
-        val qrMatrix = generateQrMatrix(url, 25)
-        val moduleSize = qrSize.toFloat() / 25f
+        val qrMatrix = generateQrMatrix(url)
+        val matrixRows = qrMatrix.size
+        val matrixCols = if (matrixRows > 0) qrMatrix[0].size else 1
+        val moduleWidth = qrSize.toFloat() / matrixCols.toFloat()
+        val moduleHeight = qrSize.toFloat() / matrixRows.toFloat()
 
         paint.color = AndroidColor.parseColor("#F6F9F9")
         canvas.drawRoundRect(RectF(qrLeft - 20f, qrTop - 20f, qrLeft + qrSize + 20f, qrTop + qrSize + 20f), 24f, 24f, paint)
 
         paint.color = AndroidColor.parseColor("#1B2324") // Deep Gunmetal
-        for (r in 0 until 25) {
-            for (c in 0 until 25) {
+        for (r in 0 until matrixRows) {
+            for (c in 0 until matrixCols) {
                 if (qrMatrix[r][c]) {
                     canvas.drawRect(
-                        qrLeft + c * moduleSize,
-                        qrTop + r * moduleSize,
-                        qrLeft + (c + 1) * moduleSize,
-                        qrTop + (r + 1) * moduleSize,
+                        qrLeft + c * moduleWidth,
+                        qrTop + r * moduleHeight,
+                        qrLeft + (c + 1) * moduleWidth,
+                        qrTop + (r + 1) * moduleHeight,
                         paint
                     )
                 }
@@ -386,10 +357,11 @@ fun TableQrCodeView(
     foregroundColor: Color = Slate900,
     backgroundColor: Color = Color.White
 ) {
-    val matrixSize = 25
     val matrix = remember(data) {
-        QrCodeGenerator.generateQrMatrix(data, matrixSize)
+        QrCodeGenerator.generateQrMatrix(data)
     }
+    val rows = matrix.size
+    val cols = if (rows > 0) matrix[0].size else 1
 
     Box(
         modifier = modifier
@@ -400,11 +372,11 @@ fun TableQrCodeView(
             .padding(12.dp)
     ) {
         Canvas(modifier = Modifier.size(sizeDp - 24.dp)) {
-            val moduleWidth = size.width / matrixSize
-            val moduleHeight = size.height / matrixSize
+            val moduleWidth = size.width / cols.toFloat()
+            val moduleHeight = size.height / rows.toFloat()
 
-            for (r in 0 until matrixSize) {
-                for (c in 0 until matrixSize) {
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
                     if (matrix[r][c]) {
                         drawRect(
                             color = foregroundColor,

@@ -20,5 +20,8 @@ data class RestaurantTable(
         get() = status == "AVAILABLE"
 
     val isOccupied: Boolean
-        get() = status == "OCCUPIED" || status == "ORDERING"
+        get() = status == "OCCUPIED" || status == "ORDERING" || status == "CHECKOUT_REQUESTED" || status == "BILLED"
+
+    val isCheckoutRequested: Boolean
+        get() = status == "CHECKOUT_REQUESTED"
 }

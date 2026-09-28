@@ -30,12 +30,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.VolumeMute
@@ -472,6 +474,9 @@ fun KitchenScreen(
                             scope.launch {
                                 PrinterManager.printKot(context, kot)
                             }
+                        },
+                        onAdjustItemQuantity = { itemStr, delta ->
+                            viewModel.updateKotItemQuantity(kot, itemStr, delta)
                         }
                     )
                 }
@@ -487,7 +492,8 @@ private fun KitchenTicketCard(
     onToggleItemCompleted: (String) -> Unit,
     onMarkAllItemsReady: () -> Unit,
     onUpdateStatus: (String) -> Unit,
-    onPrintSlip: () -> Unit
+    onPrintSlip: () -> Unit,
+    onAdjustItemQuantity: (String, Int) -> Unit = { _, _ -> }
 ) {
     val statusColor = when (kot.status) {
         "NEW" -> Amber500
@@ -748,19 +754,65 @@ private fun KitchenTicketCard(
                                 }
                             }
 
-                            // Prominent PENDING vs READY badge
-                            Surface(
-                                modifier = Modifier.clip(RoundedCornerShape(4.dp)),
-                                color = if (isPending) Amber500 else Emerald50
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Text(
-                                    text = if (isPending) "PENDING" else "DONE",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (isPending) Color.White else Emerald600,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    fontSize = 10.sp
-                                )
+                                // Item quantity adjust buttons: - and +
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                                        .padding(horizontal = 2.dp, vertical = 2.dp)
+                                ) {
+                                    Surface(
+                                        onClick = { onAdjustItemQuantity(itemStr, -1) },
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color.Transparent,
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Remove,
+                                                contentDescription = "Decrease",
+                                                tint = Slate700,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Surface(
+                                        onClick = { onAdjustItemQuantity(itemStr, 1) },
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Emerald600.copy(alpha = 0.2f),
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                Icons.Default.Add,
+                                                contentDescription = "Increase",
+                                                tint = Emerald600,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Prominent PENDING vs READY badge
+                                Surface(
+                                    modifier = Modifier.clip(RoundedCornerShape(4.dp)),
+                                    color = if (isPending) Amber500 else Emerald50
+                                ) {
+                                    Text(
+                                        text = if (isPending) "PENDING" else "DONE",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = if (isPending) Color.White else Emerald600,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        fontSize = 10.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -860,12 +912,12 @@ private fun KitchenTicketCard(
                                 .weight(1f)
                                 .height(36.dp)
                                 .testTag("mark_served_${kot.kotNumber}"),
-                            colors = ButtonDefaults.buttonColors(containerColor = Slate900),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Icon(Icons.Default.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Mark as Served", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Send to Table 🍽️", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
 

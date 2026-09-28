@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -36,16 +37,27 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.Discount
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Notes
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.TableBar
+import androidx.compose.material.icons.filled.TakeoutDining
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -88,6 +100,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.CartItem
 import com.example.data.model.ProductItem
+import com.example.data.model.RestaurantTable
 import com.example.ui.theme.Amber100
 import com.example.ui.theme.Amber500
 import com.example.ui.theme.Emerald100
@@ -130,7 +143,18 @@ fun PosCheckoutScreen(
     val totalItemsCount = cartItems.sumOf { it.quantity }
     var isCartOpen by remember { mutableStateOf(false) }
     var showAddDishDialog by remember { mutableStateOf(false) }
+    var showNewOrderDialog by remember { mutableStateOf(false) }
     var productToDelete by remember { mutableStateOf<ProductItem?>(null) }
+
+    val selectedTableNumber by viewModel.selectedTableNumber.collectAsStateWithLifecycle()
+    val selectedOrderType by viewModel.selectedOrderType.collectAsStateWithLifecycle()
+    val guestCount by viewModel.guestCount.collectAsStateWithLifecycle()
+    val customerName by viewModel.customerName.collectAsStateWithLifecycle()
+    val customerPhone by viewModel.customerPhone.collectAsStateWithLifecycle()
+    val serverName by viewModel.serverName.collectAsStateWithLifecycle()
+    val orderNotes by viewModel.orderNotes.collectAsStateWithLifecycle()
+    val allTables by viewModel.allTables.collectAsStateWithLifecycle()
+    val activeRunningTables by viewModel.activeRunningTables.collectAsStateWithLifecycle()
 
     val defaultCategories = listOf(
         "All",
@@ -173,6 +197,18 @@ fun PosCheckoutScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Button(
+                            onClick = { showNewOrderDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                            modifier = Modifier.height(52.dp).testTag("pos_new_order_button_desktop")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { viewModel.setSearchQuery(it) },
@@ -210,6 +246,71 @@ fun PosCheckoutScreen(
                             Icon(Icons.Default.Add, contentDescription = null, tint = Emerald600, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("+ Add Dish", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    if (selectedTableNumber.isNotBlank() || customerName.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .border(1.dp, Emerald500.copy(alpha = 0.5f), RoundedCornerShape(10.dp)),
+                            color = Emerald600.copy(alpha = 0.12f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Restaurant,
+                                        contentDescription = null,
+                                        tint = Emerald500,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = buildString {
+                                            if (selectedTableNumber.isNotBlank()) append("Table $selectedTableNumber • ")
+                                            if (customerName.isNotBlank()) append("$customerName • ")
+                                            append(selectedOrderType)
+                                            if (guestCount > 0 && selectedOrderType == "Dine-in") append(" ($guestCount Guests)")
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        text = "Change",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Emerald500,
+                                        modifier = Modifier
+                                            .clickable { showNewOrderDialog = true }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+                                    Text(
+                                        text = "Clear",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Rose500,
+                                        modifier = Modifier
+                                            .clickable { viewModel.clearActiveOrder() }
+                                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -346,7 +447,90 @@ fun PosCheckoutScreen(
                         .fillMaxSize()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    // Search Bar, Add Dish & Cart Quick Button
+                    // Top Strip: + New Order Button & Horizontal Active Running Tables
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showNewOrderDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier
+                                .height(38.dp)
+                                .testTag("pos_new_order_button")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("+ New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
+                        }
+
+                        // Running table chips
+                        for (rt in activeRunningTables) {
+                            val isSelected = (selectedTableNumber == rt.tableNumber)
+                            val isReq = rt.isCheckoutRequested
+                            Surface(
+                                onClick = { viewModel.loadTableIntoPosCart(rt) },
+                                modifier = Modifier
+                                    .height(38.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        width = if (isSelected || isReq) 1.8.dp else 1.dp,
+                                        color = if (isReq) Amber500 else if (isSelected) Emerald500 else Slate700,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .testTag("pos_table_chip_${rt.tableNumber}"),
+                                color = if (isReq) Amber500.copy(alpha = 0.2f)
+                                        else if (isSelected) Emerald600.copy(alpha = 0.2f)
+                                        else Slate900
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 10.dp)
+                                        .fillMaxHeight(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isReq) Amber500 else Emerald500)
+                                    )
+                                    Text(
+                                        text = "T-${rt.tableNumber}" + if (rt.currentGuestName.isNotBlank()) " (${rt.currentGuestName.take(8)})" else "",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = Color.White,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        text = "₹${String.format("%.0f", rt.currentBillAmount)}",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 11.sp,
+                                        color = if (isReq) Amber500 else Emerald600
+                                    )
+                                    if (isReq) {
+                                        Text(
+                                            text = "• Complete Order 🔔",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 10.sp,
+                                            color = Amber500,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Full-width Search Bar, Add Dish & Cart Quick Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -358,32 +542,41 @@ fun PosCheckoutScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("pos_search_input"),
-                            placeholder = { Text("Search dish or SKU...", style = MaterialTheme.typography.bodyMedium) },
+                            placeholder = {
+                                Text(
+                                    "Search dishes or SKU...",
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            },
                             leadingIcon = {
-                                Icon(Icons.Default.Search, contentDescription = "Search", tint = Slate500)
+                                Icon(Icons.Default.Search, contentDescription = "Search", tint = Slate500, modifier = Modifier.size(20.dp))
                             },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
                                     IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Slate500)
+                                        Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = Slate500, modifier = Modifier.size(18.dp))
                                     }
                                 }
                             },
                             singleLine = true,
+                            maxLines = 1,
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Slate900,
-                                unfocusedBorderColor = Slate200,
+                                focusedBorderColor = Emerald600,
+                                unfocusedBorderColor = Slate400,
                                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                                 unfocusedContainerColor = MaterialTheme.colorScheme.surface
                             )
                         )
 
-                        // + Add Dish Button (Sleek square button with perfectly centered '+')
+                        // + Add Dish Button
                         Surface(
                             onClick = { showAddDishDialog = true },
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(52.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, Slate700, RoundedCornerShape(12.dp))
                                 .testTag("pos_add_dish_button"),
@@ -415,7 +608,7 @@ fun PosCheckoutScreen(
                         ) {
                             Surface(
                                 modifier = Modifier
-                                    .size(48.dp)
+                                    .size(52.dp)
                                     .clip(RoundedCornerShape(12.dp))
                                     .border(1.dp, if (totalItemsCount > 0) Emerald500 else Slate700, RoundedCornerShape(12.dp))
                                     .clickable { isCartOpen = true }
@@ -428,6 +621,71 @@ fun PosCheckoutScreen(
                                         imageVector = Icons.Default.ShoppingCart,
                                         contentDescription = "Open Cart",
                                         modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (selectedTableNumber.isNotBlank() || customerName.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .border(1.dp, Emerald500.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
+                            color = Emerald600.copy(alpha = 0.12f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Restaurant,
+                                        contentDescription = null,
+                                        tint = Emerald500,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = buildString {
+                                            if (selectedTableNumber.isNotBlank()) append("Table $selectedTableNumber • ")
+                                            if (customerName.isNotBlank()) append("$customerName • ")
+                                            append(selectedOrderType)
+                                            if (guestCount > 0 && selectedOrderType == "Dine-in") append(" ($guestCount Pax)")
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "Edit",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Emerald500,
+                                        modifier = Modifier
+                                            .clickable { showNewOrderDialog = true }
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                    Text(
+                                        text = "Clear",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Rose500,
+                                        modifier = Modifier
+                                            .clickable { viewModel.clearActiveOrder() }
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
                                     )
                                 }
                             }
@@ -636,6 +894,33 @@ fun PosCheckoutScreen(
                     )
                 }
             }
+        }
+
+        // New Order Dialog
+        if (showNewOrderDialog) {
+            NewOrderDialog(
+                allTables = allTables,
+                currentTableNumber = selectedTableNumber,
+                currentOrderType = selectedOrderType,
+                currentCustomerName = customerName,
+                currentCustomerPhone = customerPhone,
+                currentGuestCount = guestCount,
+                currentServerName = serverName,
+                currentNotes = orderNotes,
+                onDismiss = { showNewOrderDialog = false },
+                onStartOrder = { name, phone, table, orderType, pax, server, notes ->
+                    viewModel.startNewOrder(
+                        customerName = name,
+                        customerPhone = phone,
+                        tableNumber = table,
+                        orderType = orderType,
+                        guestCount = pax,
+                        serverName = server,
+                        notes = notes
+                    )
+                    showNewOrderDialog = false
+                }
+            )
         }
 
         // Add Dish Dialog
@@ -2007,6 +2292,414 @@ private fun AddDishDialog(
                         modifier = Modifier.testTag("save_dish_button")
                     ) {
                         Text("Save Dish to Menu", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewOrderDialog(
+    allTables: List<RestaurantTable>,
+    currentTableNumber: String,
+    currentOrderType: String,
+    currentCustomerName: String,
+    currentCustomerPhone: String,
+    currentGuestCount: Int,
+    currentServerName: String,
+    currentNotes: String,
+    onDismiss: () -> Unit,
+    onStartOrder: (name: String, phone: String, table: String, orderType: String, pax: Int, server: String, notes: String) -> Unit
+) {
+    var orderType by remember { mutableStateOf(currentOrderType.ifBlank { "Dine-in" }) }
+    var selectedTable by remember { mutableStateOf(currentTableNumber) }
+    var customerName by remember { mutableStateOf(currentCustomerName) }
+    var customerPhone by remember { mutableStateOf(currentCustomerPhone) }
+    var guestCount by remember { mutableStateOf(if (currentGuestCount > 0) currentGuestCount else 2) }
+    var serverName by remember { mutableStateOf(currentServerName) }
+    var notes by remember { mutableStateOf(currentNotes) }
+    var selectedZone by remember { mutableStateOf("All") }
+
+    val orderTypes = listOf("Dine-in", "Takeaway", "Delivery")
+    val zones = listOf("All") + allTables.map { it.zone }.distinct().filter { it.isNotBlank() }
+    val filteredTables = if (selectedZone == "All") allTables else allTables.filter { it.zone.equals(selectedZone, ignoreCase = true) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 620.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(38.dp),
+                            shape = CircleShape,
+                            color = Emerald600.copy(alpha = 0.15f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Restaurant,
+                                    contentDescription = null,
+                                    tint = Emerald600,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "New Order",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Table selection & customer details",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Slate500
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Slate500)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Order Type Selector
+                Text(
+                    text = "Order Type",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (type in orderTypes) {
+                        val isSelected = (orderType == type)
+                        val icon = when (type) {
+                            "Takeaway" -> Icons.Default.TakeoutDining
+                            "Delivery" -> Icons.Default.DeliveryDining
+                            else -> Icons.Default.TableBar
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    orderType = type
+                                    if (type != "Dine-in") selectedTable = ""
+                                },
+                            color = if (isSelected) Emerald600 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = type,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Dine-in: Table Selection
+                if (orderType == "Dine-in") {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (selectedTable.isNotBlank()) "Selected: Table $selectedTable" else "Select Table (Optional)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedTable.isNotBlank()) Emerald600 else MaterialTheme.colorScheme.onSurface
+                        )
+                        if (selectedTable.isNotBlank()) {
+                            Text(
+                                text = "Clear",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Rose500,
+                                modifier = Modifier.clickable { selectedTable = "" }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Zone filter chips
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (z in zones) {
+                            val isSel = (selectedZone == z)
+                            FilterChip(
+                                selected = isSel,
+                                onClick = { selectedZone = z },
+                                label = { Text(z, fontSize = 11.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Emerald600,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Tables horizontal scroll list
+                    if (filteredTables.isEmpty()) {
+                        Text(
+                            text = "No tables found in this area",
+                            fontSize = 12.sp,
+                            color = Slate400,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (t in filteredTables) {
+                                val isChosen = (selectedTable == t.tableNumber)
+                                val isOccupied = t.isOccupied || t.currentBillAmount > 0
+                                Surface(
+                                    modifier = Modifier
+                                        .width(88.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .border(
+                                            width = if (isChosen) 2.dp else 1.dp,
+                                            color = if (isChosen) Emerald500 else if (isOccupied) Amber500 else Slate200,
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable {
+                                            selectedTable = if (selectedTable == t.tableNumber) "" else t.tableNumber
+                                            if (customerName.isBlank() && t.currentGuestName.isNotBlank()) {
+                                                customerName = t.currentGuestName
+                                            }
+                                        },
+                                    color = if (isChosen) Emerald600.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = t.tableNumber,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${t.capacity} Seats",
+                                            fontSize = 10.sp,
+                                            color = Slate500
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (isOccupied) Amber500 else Emerald500)
+                                            )
+                                            Spacer(modifier = Modifier.width(3.dp))
+                                            Text(
+                                                text = if (isOccupied) "Running" else "Free",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isOccupied) Amber500 else Emerald500
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Number of Guests (Pax)
+                    Text(
+                        text = "Number of Guests (Pax)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        ) {
+                            IconButton(onClick = { if (guestCount > 1) guestCount-- }) {
+                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Slate700)
+                            }
+                            Text(
+                                text = "$guestCount",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp)
+                            )
+                            IconButton(onClick = { guestCount++ }) {
+                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Slate700)
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (p in listOf(1, 2, 4, 6, 8)) {
+                                Surface(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { guestCount = p },
+                                    color = if (guestCount == p) Emerald600 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    contentColor = if (guestCount == p) Color.White else MaterialTheme.colorScheme.onSurface
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("$p", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Customer Details Section
+                Text(
+                    text = "Customer Details",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                OutlinedTextField(
+                    value = customerName,
+                    onValueChange = { customerName = it },
+                    label = { Text("Customer / Guest Name") },
+                    placeholder = { Text("e.g. Rohan Sharma") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Slate500) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = customerPhone,
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) customerPhone = it },
+                    label = { Text("Mobile Number (Optional)") },
+                    placeholder = { Text("10-digit number for invoice") },
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Slate500) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = serverName,
+                        onValueChange = { serverName = it },
+                        label = { Text("Captain / Server") },
+                        placeholder = { Text("e.g. Captain 1") },
+                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = Slate500) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text("Special Requests") },
+                        placeholder = { Text("e.g. Less spicy") },
+                        leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Slate500) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Bottom Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Cancel")
+                    }
+
+                    Button(
+                        onClick = {
+                            onStartOrder(customerName, customerPhone, selectedTable, orderType, guestCount, serverName, notes)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1.5f)
+                            .testTag("start_new_order_submit_button")
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Start Order", fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -35,7 +35,7 @@ import java.util.Calendar
 
 class PosViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository: PosRepository
+    val repository: PosRepository
 
     init {
         val db = PosDatabase.getDatabase(application)
@@ -232,6 +232,10 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- Customer Table QR Self-Ordering Flow ---
+    val activeRunningTables: StateFlow<List<RestaurantTable>> = repository.allTables
+        .map { list -> list.filter { it.isOccupied || it.currentBillAmount > 0 } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _activeCustomerTable = MutableStateFlow<RestaurantTable?>(null)
     val activeCustomerTable: StateFlow<RestaurantTable?> = _activeCustomerTable.asStateFlow()
 
@@ -246,6 +250,120 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _customerOrderPlacedSuccess = MutableStateFlow(false)
     val customerOrderPlacedSuccess: StateFlow<Boolean> = _customerOrderPlacedSuccess.asStateFlow()
+
+    fun requestTableCheckout(tableNumber: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val table = repository.getTableByNumber(tableNumber.trim())
+            if (table != null) {
+                repository.updateTableStatus(
+                    tableId = table.tableId,
+                    status = "CHECKOUT_REQUESTED",
+                    guestName = table.currentGuestName,
+                    billAmount = table.currentBillAmount
+                )
+            }
+        }
+    }
+
+    data class ParsedKotItem(val name: String, val qty: Int)
+
+    fun parseItemSummaryLine(line: String): ParsedKotItem {
+        val trimmed = line.trim()
+        val regex1 = Regex("""^(\d+)\s*[xX]\s*(.+)""")
+        val match1 = regex1.find(trimmed)
+        if (match1 != null) {
+            val qty = match1.groupValues[1].toIntOrNull() ?: 1
+            val name = match1.groupValues[2].trim()
+            return ParsedKotItem(name, qty)
+        }
+        val regex2 = Regex("""^(.+?)\s*[xX]\s*(\d+)$""")
+        val match2 = regex2.find(trimmed)
+        if (match2 != null) {
+            val name = match2.groupValues[1].trim()
+            val qty = match2.groupValues[2].toIntOrNull() ?: 1
+            return ParsedKotItem(name, qty)
+        }
+        return ParsedKotItem(trimmed, 1)
+    }
+
+    fun updateKotItemQuantity(kot: KitchenOrderTicket, itemLine: String, delta: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+            val targetParsed = parseItemSummaryLine(itemLine)
+            val index = items.indexOfFirst {
+                val p = parseItemSummaryLine(it)
+                p.name.equals(targetParsed.name, ignoreCase = true)
+            }
+            if (index >= 0) {
+                val current = parseItemSummaryLine(items[index])
+                val newQty = current.qty + delta
+                if (newQty <= 0) {
+                    items.removeAt(index)
+                } else {
+                    items[index] = "${newQty}x ${current.name}"
+                }
+                val updatedSummary = items.joinToString(" ; ")
+                val updatedKot = kot.copy(itemsSummary = updatedSummary)
+                repository.updateKot(updatedKot)
+
+                // Adjust table bill
+                val productsList = repository.allProducts.firstOrNull() ?: emptyList()
+                val prod = productsList.find { it.name.equals(current.name, ignoreCase = true) }
+                if (prod != null) {
+                    val table = repository.getTableByNumber(kot.tableNumber)
+                    if (table != null) {
+                        val billDelta = delta * prod.sellingPrice
+                        val newBill = (table.currentBillAmount + billDelta).coerceAtLeast(0.0)
+                        repository.updateTableStatus(table.tableId, table.status, table.currentGuestName, newBill)
+                    }
+                }
+            }
+        }
+    }
+
+    fun loadTableIntoPosCart(table: RestaurantTable) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _selectedTableNumber.value = table.tableNumber
+            _selectedOrderType.value = "Dine-in"
+            _customerName.value = table.currentGuestName
+
+            val activeKotsForTable = repository.allKots.firstOrNull()?.filter {
+                it.tableNumber.equals(table.tableNumber, ignoreCase = true) && it.status != "CANCELLED"
+            } ?: emptyList()
+
+            val productsList = repository.allProducts.firstOrNull() ?: emptyList()
+            val newCart = mutableListOf<CartItem>()
+
+            for (kot in activeKotsForTable) {
+                val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+                for (itemLine in items) {
+                    val parsed = parseItemSummaryLine(itemLine)
+                    val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
+                    if (prod != null) {
+                        val existing = newCart.indexOfFirst { it.product.id == prod.id }
+                        if (existing >= 0) {
+                            newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
+                        } else {
+                            newCart.add(CartItem(product = prod, quantity = parsed.qty))
+                        }
+                    }
+                }
+            }
+
+            if (newCart.isNotEmpty()) {
+                _cartItems.value = newCart
+            } else if (table.currentBillAmount > 0) {
+                val customDish = productsList.firstOrNull() ?: ProductItem(
+                    name = "Table ${table.tableNumber} Food & Beverages",
+                    category = "Dine-in",
+                    sku = "TAB-${table.tableNumber}",
+                    sellingPrice = table.currentBillAmount,
+                    stockQuantity = 999
+                )
+                _cartItems.value = listOf(CartItem(product = customDish.copy(sellingPrice = table.currentBillAmount), quantity = 1))
+            }
+        }
+    }
 
     fun startCustomerTableOrder(table: RestaurantTable) {
         _activeCustomerTable.value = table
@@ -359,6 +477,21 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
     private val _customerPhone = MutableStateFlow("")
     val customerPhone: StateFlow<String> = _customerPhone.asStateFlow()
 
+    private val _selectedTableNumber = MutableStateFlow("")
+    val selectedTableNumber: StateFlow<String> = _selectedTableNumber.asStateFlow()
+
+    private val _selectedOrderType = MutableStateFlow("Dine-in") // Dine-in, Takeaway, Delivery
+    val selectedOrderType: StateFlow<String> = _selectedOrderType.asStateFlow()
+
+    private val _guestCount = MutableStateFlow(2)
+    val guestCount: StateFlow<Int> = _guestCount.asStateFlow()
+
+    private val _serverName = MutableStateFlow("")
+    val serverName: StateFlow<String> = _serverName.asStateFlow()
+
+    private val _orderNotes = MutableStateFlow("")
+    val orderNotes: StateFlow<String> = _orderNotes.asStateFlow()
+
     private val _paymentMethod = MutableStateFlow("CASH") // CASH, CARD, UPI
     val paymentMethod: StateFlow<String> = _paymentMethod.asStateFlow()
 
@@ -422,6 +555,57 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         _customerPhone.value = ""
         _cashTendered.value = 0.0
         _paymentMethod.value = "CASH"
+    }
+
+    fun startNewOrder(
+        customerName: String,
+        customerPhone: String,
+        tableNumber: String,
+        orderType: String = "Dine-in",
+        guestCount: Int = 2,
+        serverName: String = "",
+        notes: String = ""
+    ) {
+        clearCart()
+        _customerName.value = customerName.trim()
+        _customerPhone.value = customerPhone.trim()
+        _selectedTableNumber.value = tableNumber.trim()
+        _selectedOrderType.value = orderType.trim()
+        _guestCount.value = guestCount.coerceAtLeast(1)
+        _serverName.value = serverName.trim()
+        _orderNotes.value = notes.trim()
+
+        if (tableNumber.isNotBlank() && orderType == "Dine-in") {
+            viewModelScope.launch(Dispatchers.IO) {
+                val table = repository.getTableByNumber(tableNumber.trim())
+                if (table != null) {
+                    val displayName = customerName.ifBlank { "Table ${table.tableNumber}" }
+                    repository.updateTableStatus(
+                        tableId = table.tableId,
+                        status = "OCCUPIED",
+                        guestName = displayName,
+                        billAmount = table.currentBillAmount
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearActiveOrder() {
+        clearCart()
+        _selectedTableNumber.value = ""
+        _selectedOrderType.value = "Dine-in"
+        _guestCount.value = 2
+        _serverName.value = ""
+        _orderNotes.value = ""
+    }
+
+    fun setSelectedTableNumber(table: String) {
+        _selectedTableNumber.value = table.trim()
+    }
+
+    fun setSelectedOrderType(type: String) {
+        _selectedOrderType.value = type.trim()
     }
 
     fun setBillDiscountPercent(percent: Double) {
@@ -530,11 +714,13 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
 
         val netProfit = (grandTotal - totalTax - totalCost).coerceAtLeast(0.0)
         val invoiceNo = "INV-${Calendar.getInstance().get(Calendar.YEAR)}-${(1000 + (System.currentTimeMillis() % 9000))}"
+        val tableNum = _selectedTableNumber.value
+        val orderTypeVal = _selectedOrderType.value
 
         val order = SaleOrder(
             invoiceNumber = invoiceNo,
             timestamp = System.currentTimeMillis(),
-            customerName = _customerName.value.ifBlank { "Walk-in Customer" },
+            customerName = _customerName.value.ifBlank { if (tableNum.isNotBlank()) "Table $tableNum" else "Walk-in Customer" },
             customerPhone = _customerPhone.value,
             paymentMethod = _paymentMethod.value,
             subtotal = subtotal,
@@ -544,20 +730,38 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
             totalAmount = grandTotal,
             totalCost = totalCost,
             netProfit = netProfit,
-            notes = if (_paymentMethod.value == "CASH" && _cashTendered.value > 0) {
-                val change = (_cashTendered.value - grandTotal).coerceAtLeast(0.0)
-                "Cash tendered ₹${String.format("%.2f", _cashTendered.value)}, Change ₹${String.format("%.2f", change)}"
-            } else ""
+            tableNumber = tableNum,
+            orderType = orderTypeVal,
+            notes = buildString {
+                if (_paymentMethod.value == "CASH" && _cashTendered.value > 0) {
+                    val change = (_cashTendered.value - grandTotal).coerceAtLeast(0.0)
+                    append("Cash tendered ₹${String.format("%.2f", _cashTendered.value)}, Change ₹${String.format("%.2f", change)}. ")
+                }
+                if (_serverName.value.isNotBlank()) append("Server: ${_serverName.value}. ")
+                if (_guestCount.value > 0 && orderTypeVal == "Dine-in") append("Pax: ${_guestCount.value}. ")
+                if (_orderNotes.value.isNotBlank()) append("Notes: ${_orderNotes.value}")
+            }.trim()
         )
 
         viewModelScope.launch(Dispatchers.IO) {
             val orderId = repository.completeSale(order, orderItems, items)
+            if (tableNum.isNotBlank() && orderTypeVal == "Dine-in") {
+                val table = repository.getTableByNumber(tableNum)
+                if (table != null) {
+                    repository.vacateTable(table.tableId)
+                }
+            }
             val completedOrderWithItems = OrderWithItems(
                 order = order.copy(orderId = orderId),
                 items = orderItems.map { it.copy(orderId = orderId) }
             )
             _lastCompletedOrder.value = completedOrderWithItems
             clearCart()
+            _selectedTableNumber.value = ""
+            _selectedOrderType.value = "Dine-in"
+            _guestCount.value = 2
+            _serverName.value = ""
+            _orderNotes.value = ""
             launch(Dispatchers.Main) {
                 onSuccess(completedOrderWithItems)
             }
