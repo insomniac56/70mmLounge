@@ -1,0 +1,6 @@
+{
+  "name": "70mm Lounge",
+  "description": "70mm Lounge Restaurant & Club POS, Table QR Self-Ordering, Kitchen KOT, Inventory & Real-Time Reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
