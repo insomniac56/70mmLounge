@@ -6,7 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,8 +62,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,11 +112,28 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIncomingIntent(intent)
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             RetailPosTheme(darkTheme = isDarkMode) {
                 MainAppScaffold(viewModel = viewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: android.content.Intent?) {
+        val uri = intent?.data ?: return
+        val tableParam = uri.getQueryParameter("table")
+            ?: uri.lastPathSegment?.takeIf { it != "order" && it != "table" }
+        val zoneParam = uri.getQueryParameter("zone") ?: "Club area"
+        if (!tableParam.isNullOrBlank()) {
+            viewModel.openCustomerOrderingForTableNumber(tableParam, zoneParam)
         }
     }
 }
@@ -165,22 +187,19 @@ fun MainAppScaffold(viewModel: PosViewModel) {
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(end = 4.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_70mm),
+                            contentDescription = "70mm Lounge Logo",
                             modifier = Modifier
-                                .size(34.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            color = Slate900
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "70",
-                                    color = Emerald600,
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 15.sp
-                                )
-                            }
-                        }
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, Emerald600, CircleShape),
+                            contentScale = ContentScale.Fit
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
@@ -188,13 +207,17 @@ fun MainAppScaffold(viewModel: PosViewModel) {
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 0.5.sp,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "Restaurant & Club • Bokaro",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Slate500,
-                                fontSize = 10.sp
+                                fontSize = 10.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

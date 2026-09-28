@@ -160,6 +160,18 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun deleteTable(tableId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteTable(tableId)
+        }
+    }
+
+    fun clearAllRunningTables() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.clearAllRunningTables()
+        }
+    }
+
     // --- Kitchen Order Tickets (KOT) & Kitchen Staff Pending Items ---
     val activeKots: StateFlow<List<KitchenOrderTicket>> = repository.activeKots
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

@@ -55,6 +55,14 @@ class PosRepository(private val dao: PosDao) {
         dao.deleteTable(table)
     }
 
+    suspend fun deleteTable(tableId: Long) {
+        dao.deleteTableById(tableId)
+    }
+
+    suspend fun clearAllRunningTables() {
+        dao.clearAllRunningTables()
+    }
+
     suspend fun updateTableStatus(tableId: Long, status: String, guestName: String, billAmount: Double) {
         dao.updateTableStatus(tableId, status, guestName, billAmount)
     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -91,6 +92,7 @@ import com.example.ui.theme.Amber100
 import com.example.ui.theme.Amber500
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald50
+import com.example.ui.theme.Emerald500
 import com.example.ui.theme.Emerald600
 import com.example.ui.theme.Rose100
 import com.example.ui.theme.Rose500
@@ -228,17 +230,22 @@ fun PosCheckoutScreen(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { viewModel.setSelectedCategory(cat) },
-                                label = { Text(labelText, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                label = {
+                                    Text(
+                                        text = labelText,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Slate900,
+                                    selectedContainerColor = Emerald600,
                                     selectedLabelColor = Color.White,
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    labelColor = Slate700
+                                    containerColor = Color(0xFF242F31),
+                                    labelColor = Color(0xFFE2E8F0)
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     enabled = true,
                                     selected = isSelected,
-                                    borderColor = if (isSelected) Slate900 else Slate200
+                                    borderColor = if (isSelected) Emerald500 else Color(0xFF4B5B5E)
                                 ),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.testTag("filter_chip_$cat")
@@ -372,17 +379,25 @@ fun PosCheckoutScreen(
                             )
                         )
 
-                        // + Add Dish Button
-                        Button(
+                        // + Add Dish Button (Sleek square button with perfectly centered '+')
+                        Surface(
                             onClick = { showAddDishDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = Slate900),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp),
-                            modifier = Modifier.height(52.dp).testTag("pos_add_dish_button")
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .border(1.dp, Slate700, RoundedCornerShape(12.dp))
+                                .testTag("pos_add_dish_button"),
+                            color = Slate900,
+                            contentColor = Emerald600
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, tint = Emerald600, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ Add", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add Dish",
+                                    tint = Emerald600,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
 
                         // Quick Cart Access Icon Button
@@ -400,18 +415,19 @@ fun PosCheckoutScreen(
                         ) {
                             Surface(
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
                                     .clip(RoundedCornerShape(12.dp))
+                                    .border(1.dp, if (totalItemsCount > 0) Emerald500 else Slate700, RoundedCornerShape(12.dp))
                                     .clickable { isCartOpen = true }
                                     .testTag("open_cart_button"),
-                                color = if (totalItemsCount > 0) Slate900 else Slate100,
-                                contentColor = if (totalItemsCount > 0) Color.White else Slate700
+                                color = if (totalItemsCount > 0) Emerald600 else Slate900,
+                                contentColor = if (totalItemsCount > 0) Color.White else Emerald600
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = Icons.Default.ShoppingCart,
                                         contentDescription = "Open Cart",
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                 }
                             }
@@ -435,17 +451,22 @@ fun PosCheckoutScreen(
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { viewModel.setSelectedCategory(cat) },
-                                label = { Text(labelText, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                label = {
+                                    Text(
+                                        text = labelText,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                    )
+                                },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Slate900,
+                                    selectedContainerColor = Emerald600,
                                     selectedLabelColor = Color.White,
-                                    containerColor = MaterialTheme.colorScheme.surface,
-                                    labelColor = Slate700
+                                    containerColor = Color(0xFF242F31),
+                                    labelColor = Color(0xFFE2E8F0)
                                 ),
                                 border = FilterChipDefaults.filterChipBorder(
                                     enabled = true,
                                     selected = isSelected,
-                                    borderColor = if (isSelected) Slate900 else Slate200
+                                    borderColor = if (isSelected) Emerald500 else Color(0xFF4B5B5E)
                                 ),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.testTag("filter_chip_$cat")
@@ -739,22 +760,6 @@ private fun ProductCatalogRow(
                         fontSize = 11.sp
                     )
 
-                    // GST badge
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Sky100)
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
-                    ) {
-                        Text(
-                            text = "GST ${product.gstRate.toInt()}%",
-                            color = Sky600,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
                     // Stock status badge
                     if (product.isOutOfStock) {
                         Box(
@@ -792,15 +797,17 @@ private fun ProductCatalogRow(
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Price & Add/Qty stepper & Delete
+            // Price & Add/Qty stepper & Delete (stable layout preventing shift)
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.widthIn(min = 96.dp)
             ) {
                 Text(
                     text = CurrencyFormatter.format(product.sellingPrice),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Black,
+                    maxLines = 1,
                     color = if (product.isOutOfStock) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else MaterialTheme.colorScheme.onSurface
                 )
 
@@ -812,20 +819,20 @@ private fun ProductCatalogRow(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Emerald50)
-                                .border(1.dp, Emerald100, RoundedCornerShape(8.dp))
+                                .background(Emerald600.copy(alpha = 0.15f))
+                                .border(1.dp, Emerald600, RoundedCornerShape(8.dp))
                         ) {
                             IconButton(
                                 onClick = onDecrement,
                                 modifier = Modifier.size(28.dp).testTag("decrement_${product.id}")
                             ) {
-                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Emerald600, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Emerald500, modifier = Modifier.size(16.dp))
                             }
                             Text(
                                 text = "$currentCartQty",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Emerald600,
+                                color = Color.White,
                                 modifier = Modifier.padding(horizontal = 6.dp)
                             )
                             IconButton(
@@ -833,7 +840,7 @@ private fun ProductCatalogRow(
                                 enabled = currentCartQty < product.stockQuantity,
                                 modifier = Modifier.size(28.dp).testTag("increment_${product.id}")
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Emerald600, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Emerald500, modifier = Modifier.size(16.dp))
                             }
                         }
                     } else {
@@ -841,15 +848,20 @@ private fun ProductCatalogRow(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(enabled = !product.isOutOfStock, onClick = onAddToCart),
-                            color = if (product.isOutOfStock) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
-                            contentColor = if (product.isOutOfStock) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary
+                            color = if (product.isOutOfStock) Slate800 else Emerald600,
+                            contentColor = if (product.isOutOfStock) Slate500 else Color.White
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add to Cart", modifier = Modifier.size(14.dp), tint = Emerald600)
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Add to Cart",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = if (product.isOutOfStock) Slate500 else Color.White
+                                )
                                 Text("ADD", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }

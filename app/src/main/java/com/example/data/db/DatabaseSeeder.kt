@@ -244,18 +244,18 @@ object DatabaseSeeder {
             tableNumber = "C-2",
             zone = "Club area",
             capacity = 6,
-            status = "OCCUPIED",
-            currentGuestName = "Aman & Friends",
-            currentBillAmount = 1420.0,
+            status = "AVAILABLE",
+            currentGuestName = "",
+            currentBillAmount = 0.0,
             qrPayload = TableUrlGenerator.createDynamicTableUrl("C-2", "Club area")
         ),
         RestaurantTable(
             tableNumber = "C-3",
             zone = "Club area",
             capacity = 8,
-            status = "ORDERING",
-            currentGuestName = "Rohan Party",
-            currentBillAmount = 2150.0,
+            status = "AVAILABLE",
+            currentGuestName = "",
+            currentBillAmount = 0.0,
             qrPayload = TableUrlGenerator.createDynamicTableUrl("C-3", "Club area")
         ),
         RestaurantTable(
@@ -292,9 +292,9 @@ object DatabaseSeeder {
             tableNumber = "O-2",
             zone = "Outdoor",
             capacity = 4,
-            status = "OCCUPIED",
-            currentGuestName = "Vikram",
-            currentBillAmount = 880.0,
+            status = "AVAILABLE",
+            currentGuestName = "",
+            currentBillAmount = 0.0,
             qrPayload = TableUrlGenerator.createDynamicTableUrl("O-2", "Outdoor")
         ),
         RestaurantTable(
@@ -382,6 +382,8 @@ object DatabaseSeeder {
         if (dao.getTableByNumber("C-1") == null) {
             dao.deleteAllTables()
             dao.insertAllTables(sampleTables)
+        } else {
+            dao.clearAllRunningTables()
         }
 
         if (dao.getKotCount() == 0) {

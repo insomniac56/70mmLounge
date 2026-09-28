@@ -71,6 +71,12 @@ interface PosDao {
     @Delete
     suspend fun deleteTable(table: RestaurantTable)
 
+    @Query("DELETE FROM restaurant_tables WHERE tableId = :tableId")
+    suspend fun deleteTableById(tableId: Long)
+
+    @Query("UPDATE restaurant_tables SET status = 'AVAILABLE', currentGuestName = '', currentBillAmount = 0.0, activeOrderId = NULL")
+    suspend fun clearAllRunningTables()
+
     @Query("UPDATE restaurant_tables SET status = :status, currentGuestName = :guestName, currentBillAmount = :billAmount WHERE tableId = :tableId")
     suspend fun updateTableStatus(tableId: Long, status: String, guestName: String, billAmount: Double)
 

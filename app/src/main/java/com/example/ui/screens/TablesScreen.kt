@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Person
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,6 +74,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -81,7 +84,9 @@ import com.example.ui.theme.Amber100
 import com.example.ui.theme.Amber500
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald50
+import com.example.ui.theme.Emerald500
 import com.example.ui.theme.Emerald600
+import com.example.ui.theme.Rose500
 import com.example.ui.theme.Sky100
 import com.example.ui.theme.Sky600
 import com.example.ui.theme.Slate100
@@ -135,27 +140,38 @@ fun TablesScreen(
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // Header
+            // Header: Title on Left, Download All QRs on Right (One line, robust layout)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
+                ) {
                     Text(
                         text = "Table System & QR Codes",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "70MM Lounge • Club area, Outdoor & Back area",
+                        text = "Club area, Outdoor & Back area",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500
+                        color = Slate500,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Button(
                         onClick = {
                             for (t in tables) {
@@ -166,64 +182,36 @@ fun TablesScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
                         shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         modifier = Modifier.testTag("download_all_qrs_button")
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Download All QRs", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "Download All QRs",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
                     }
 
-                    Button(
+                    // Add Table Button
+                    Surface(
                         onClick = { showAddTableDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate900),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("add_table_top_button")
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, Slate700, RoundedCornerShape(10.dp))
+                            .testTag("add_table_top_button"),
+                        color = Slate900,
+                        contentColor = Emerald600
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Table", fontSize = 11.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Permanent QR Standee Information Banner
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, Emerald100, RoundedCornerShape(12.dp)),
-                color = Emerald50.copy(alpha = 0.7f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.QrCode2,
-                        contentDescription = "Permanent QR Standees",
-                        tint = Emerald600,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Permanent Table QR Standees (One-Time Setup)",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Slate900
-                        )
-                        Text(
-                            text = "Har table ka QR Code ek hi baar generate hota hai. Har table par uska standee laga dein. Customer mobile camera se scan karega toh use seedha clean Customer Menu page dikhega jahan Name & Mobile daal kar order seedha KOT aur POS me table active kar dega!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Slate700,
-                            fontSize = 11.sp
-                        )
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Add, contentDescription = "Add Table", modifier = Modifier.size(20.dp))
+                        }
                     }
                 }
             }
@@ -425,17 +413,22 @@ fun TablesScreen(
                     FilterChip(
                         selected = isSelected,
                         onClick = { selectedZone = z },
-                        label = { Text(z) },
+                        label = {
+                            Text(
+                                text = z,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Slate900,
+                            selectedContainerColor = Emerald600,
                             selectedLabelColor = Color.White,
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            labelColor = Slate700
+                            containerColor = Color(0xFF242F31),
+                            labelColor = Color(0xFFE2E8F0)
                         ),
                         border = FilterChipDefaults.filterChipBorder(
                             enabled = true,
                             selected = isSelected,
-                            borderColor = if (isSelected) Slate900 else Slate200
+                            borderColor = if (isSelected) Emerald500 else Color(0xFF4B5B5E)
                         ),
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.testTag("zone_filter_$z")
@@ -460,7 +453,7 @@ fun TablesScreen(
                         table = table,
                         isDarkMode = isDarkMode,
                         onViewQr = { viewModel.openTableQr(table) },
-                        onCustomerOrder = { onNavigateToCustomerOrder(table) },
+                        onDelete = { viewModel.deleteTable(table.tableId) },
                         onSettleBill = { onNavigateToCheckout(table) },
                         onVacate = { viewModel.vacateTable(table.tableId) }
                     )
@@ -511,12 +504,13 @@ private fun RestaurantTableCard(
     table: RestaurantTable,
     isDarkMode: Boolean,
     onViewQr: () -> Unit,
-    onCustomerOrder: () -> Unit,
+    onDelete: () -> Unit,
     onSettleBill: () -> Unit,
     onVacate: () -> Unit
 ) {
     val context = LocalContext.current
     val isRunning = table.isOccupied || table.currentBillAmount > 0
+    var showDeleteDialog by remember { mutableStateOf(false) }
 
     // Visual indicators: Green for Available, Yellow for Running
     val cardBg = if (isRunning) {
@@ -748,22 +742,21 @@ private fun RestaurantTableCard(
                         )
                     }
 
-                    // Customer Order Simulator button
-                    Button(
-                        onClick = onCustomerOrder,
+                    // Delete Table Button
+                    IconButton(
+                        onClick = { showDeleteDialog = true },
                         modifier = Modifier
-                            .weight(1.15f)
-                            .height(34.dp)
-                            .testTag("order_button_${table.tableNumber}"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRunning) Color(0xFFD97706) else Color(0xFF16A34A)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Rose500.copy(alpha = 0.12f))
+                            .testTag("delete_table_${table.tableNumber}")
                     ) {
-                        Icon(Icons.Default.Restaurant, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Scan Menu", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Icon(
+                            Icons.Default.DeleteOutline,
+                            contentDescription = "Delete Table",
+                            tint = Rose500,
+                            modifier = Modifier.size(17.dp)
+                        )
                     }
                 }
 
@@ -803,6 +796,42 @@ private fun RestaurantTableCard(
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Text(
+                    text = "Delete Table ${table.tableNumber}?",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            },
+            text = {
+                Text(
+                    text = "Kya aap Table ${table.tableNumber} (${table.zone}) ko delete karna chahte hain?" +
+                            if (isRunning) "\n\n⚠️ Is table par abhi active order chalu hai!" else "",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Rose500)
+                ) {
+                    Text("Delete", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
