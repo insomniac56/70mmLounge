@@ -703,70 +703,70 @@ private fun RestaurantTableCard(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Action Buttons: Customer Menu, View QR Standee, Delete
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Customer Menu in-app button
-                    Button(
-                        onClick = onOpenCustomerMenu,
-                        modifier = Modifier
-                            .weight(1.1f)
-                            .height(34.dp)
-                            .testTag("customer_menu_button_${table.tableNumber}"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
+                if (!isRunning) {
+                    // Action Buttons when table is available: Customer Menu, View QR Standee, Delete
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("Customer Menu", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                    }
+                        // Customer Menu in-app button
+                        Button(
+                            onClick = onOpenCustomerMenu,
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .height(34.dp)
+                                .testTag("customer_menu_button_${table.tableNumber}"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Icon(Icons.Default.RestaurantMenu, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Customer Menu", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
 
-                    // Table QR Standee button
-                    OutlinedButton(
-                        onClick = onViewQr,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(34.dp)
-                            .testTag("qr_button_${table.tableNumber}"),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, cardBorderColor.copy(alpha = 0.5f))
-                    ) {
-                        Icon(Icons.Default.QrCode2, contentDescription = "QR Code", modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("QR Standee", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                    }
+                        // Table QR Standee button
+                        OutlinedButton(
+                            onClick = onViewQr,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(34.dp)
+                                .testTag("qr_button_${table.tableNumber}"),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, cardBorderColor.copy(alpha = 0.5f))
+                        ) {
+                            Icon(Icons.Default.QrCode2, contentDescription = "QR Code", modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("QR Standee", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                        }
 
-                    // Delete Table Button
-                    IconButton(
-                        onClick = { showDeleteDialog = true },
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Rose500.copy(alpha = 0.12f))
-                            .testTag("delete_table_${table.tableNumber}")
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteOutline,
-                            contentDescription = "Delete Table",
-                            tint = Rose500,
-                            modifier = Modifier.size(17.dp)
-                        )
+                        // Delete Table Button
+                        IconButton(
+                            onClick = { showDeleteDialog = true },
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Rose500.copy(alpha = 0.12f))
+                                .testTag("delete_table_${table.tableNumber}")
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteOutline,
+                                contentDescription = "Delete Table",
+                                tint = Rose500,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
                     }
-                }
-
-                if (isRunning) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                } else {
+                    // Running Table Actions: Customer Menu & QR Standee are hidden
                     if (isReq) {
                         Button(
                             onClick = onSettleBill,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(34.dp)
+                                .height(36.dp)
                                 .testTag("complete_order_button_${table.tableNumber}"),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -777,7 +777,7 @@ private fun RestaurantTableCard(
                         ) {
                             Icon(Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Complete Order 🔔", fontSize = 11.5.sp, fontWeight = FontWeight.Black)
+                            Text("Complete Order 🔔 • ${CurrencyFormatter.format(table.currentBillAmount)}", fontSize = 12.sp, fontWeight = FontWeight.Black)
                         }
                     } else {
                         Row(
@@ -788,27 +788,29 @@ private fun RestaurantTableCard(
                                 onClick = onVacate,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(32.dp),
+                                    .height(34.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 contentPadding = PaddingValues(0.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.5f))
                             ) {
-                                Text("Vacate", fontSize = 11.sp, color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFFB45309))
+                                Text("Vacate", fontSize = 11.5.sp, color = if (isDarkMode) Color(0xFFFDE68A) else Color(0xFFB45309), fontWeight = FontWeight.SemiBold)
                             }
 
                             Button(
                                 onClick = onSettleBill,
                                 modifier = Modifier
-                                    .weight(1.2f)
-                                    .height(32.dp),
+                                    .weight(1.3f)
+                                    .height(34.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFFD97706),
+                                    containerColor = Emerald600,
                                     contentColor = Color.White
                                 ),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text("Settle Bill", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.Receipt, contentDescription = null, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("POS Cart", fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

@@ -382,8 +382,6 @@ object DatabaseSeeder {
         if (dao.getTableByNumber("C-1") == null) {
             dao.deleteAllTables()
             dao.insertAllTables(sampleTables)
-        } else {
-            dao.clearAllRunningTables()
         }
 
         if (dao.getKotCount() == 0) {

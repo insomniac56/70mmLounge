@@ -321,46 +321,116 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    data class TableDraft(
+        val tableNumber: String,
+        val customerName: String = "",
+        val customerPhone: String = "",
+        val orderType: String = "Dine-in",
+        val guestCount: Int = 2,
+        val serverName: String = "",
+        val orderNotes: String = "",
+        val cartItems: List<CartItem> = emptyList(),
+        val billDiscountPercent: Double = 0.0
+    )
+
+    private val _tableDrafts = mutableMapOf<String, TableDraft>()
+
+    fun saveCurrentTableDraft() {
+        val table = _selectedTableNumber.value.trim()
+        if (table.isNotBlank()) {
+            _tableDrafts[table] = TableDraft(
+                tableNumber = table,
+                customerName = _customerName.value,
+                customerPhone = _customerPhone.value,
+                orderType = _selectedOrderType.value,
+                guestCount = _guestCount.value,
+                serverName = _serverName.value,
+                orderNotes = _orderNotes.value,
+                cartItems = _cartItems.value,
+                billDiscountPercent = _billDiscountPercent.value
+            )
+        }
+    }
+
+    private fun syncCurrentTableBillAndDraft() {
+        val tableNum = _selectedTableNumber.value.trim()
+        saveCurrentTableDraft()
+        if (tableNum.isNotBlank()) {
+            val total = _cartItems.value.sumOf { it.totalAmount }
+            viewModelScope.launch(Dispatchers.IO) {
+                val table = repository.getTableByNumber(tableNum)
+                if (table != null) {
+                    repository.updateTableStatus(
+                        tableId = table.tableId,
+                        status = if (table.status == "AVAILABLE") "OCCUPIED" else table.status,
+                        guestName = _customerName.value.ifBlank { table.currentGuestName },
+                        billAmount = total
+                    )
+                }
+            }
+        }
+    }
+
     fun loadTableIntoPosCart(table: RestaurantTable) {
-        viewModelScope.launch(Dispatchers.IO) {
-            _selectedTableNumber.value = table.tableNumber
-            _selectedOrderType.value = "Dine-in"
+        saveCurrentTableDraft()
+        val tableNum = table.tableNumber.trim()
+        _selectedTableNumber.value = tableNum
+        _selectedOrderType.value = "Dine-in"
+
+        val draft = _tableDrafts[tableNum]
+        if (draft != null) {
+            _cartItems.value = draft.cartItems
+            _customerName.value = draft.customerName.ifBlank { table.currentGuestName }
+            _customerPhone.value = draft.customerPhone
+            _guestCount.value = draft.guestCount
+            _serverName.value = draft.serverName
+            _orderNotes.value = draft.orderNotes
+            _billDiscountPercent.value = draft.billDiscountPercent
+        } else {
             _customerName.value = table.currentGuestName
+            _customerPhone.value = ""
+            _orderNotes.value = ""
+            _billDiscountPercent.value = 0.0
 
-            val activeKotsForTable = repository.allKots.firstOrNull()?.filter {
-                it.tableNumber.equals(table.tableNumber, ignoreCase = true) && it.status != "CANCELLED"
-            } ?: emptyList()
+            viewModelScope.launch(Dispatchers.IO) {
+                val activeKotsForTable = repository.allKots.firstOrNull()?.filter {
+                    it.tableNumber.equals(tableNum, ignoreCase = true) && it.status != "CANCELLED"
+                } ?: emptyList()
 
-            val productsList = repository.allProducts.firstOrNull() ?: emptyList()
-            val newCart = mutableListOf<CartItem>()
+                val productsList = repository.allProducts.firstOrNull() ?: emptyList()
+                val newCart = mutableListOf<CartItem>()
 
-            for (kot in activeKotsForTable) {
-                val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
-                for (itemLine in items) {
-                    val parsed = parseItemSummaryLine(itemLine)
-                    val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
-                    if (prod != null) {
-                        val existing = newCart.indexOfFirst { it.product.id == prod.id }
-                        if (existing >= 0) {
-                            newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
-                        } else {
-                            newCart.add(CartItem(product = prod, quantity = parsed.qty))
+                for (kot in activeKotsForTable) {
+                    val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+                    for (itemLine in items) {
+                        val parsed = parseItemSummaryLine(itemLine)
+                        val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
+                        if (prod != null) {
+                            val existing = newCart.indexOfFirst { it.product.id == prod.id }
+                            if (existing >= 0) {
+                                newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
+                            } else {
+                                newCart.add(CartItem(product = prod, quantity = parsed.qty))
+                            }
                         }
                     }
                 }
-            }
 
-            if (newCart.isNotEmpty()) {
-                _cartItems.value = newCart
-            } else if (table.currentBillAmount > 0) {
-                val customDish = productsList.firstOrNull() ?: ProductItem(
-                    name = "Table ${table.tableNumber} Food & Beverages",
-                    category = "Dine-in",
-                    sku = "TAB-${table.tableNumber}",
-                    sellingPrice = table.currentBillAmount,
-                    stockQuantity = 999
-                )
-                _cartItems.value = listOf(CartItem(product = customDish.copy(sellingPrice = table.currentBillAmount), quantity = 1))
+                if (newCart.isNotEmpty()) {
+                    _cartItems.value = newCart
+                } else if (table.currentBillAmount > 0) {
+                    val customDish = productsList.firstOrNull() ?: ProductItem(
+                        name = "Table ${table.tableNumber} Food & Beverages",
+                        category = "Dine-in",
+                        sku = "TAB-${table.tableNumber}",
+                        sellingPrice = table.currentBillAmount,
+                        stockQuantity = 999
+                    )
+                    _cartItems.value = listOf(CartItem(product = customDish.copy(sellingPrice = table.currentBillAmount), quantity = 1))
+                } else {
+                    _cartItems.value = emptyList()
+                }
+                saveCurrentTableDraft()
             }
         }
     }
@@ -516,6 +586,7 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         _cartItems.value = currentList
+        syncCurrentTableBillAndDraft()
     }
 
     fun updateCartItemQuantity(productId: Long, delta: Int) {
@@ -530,6 +601,7 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 currentList[index] = item.copy(quantity = newQty)
             }
             _cartItems.value = currentList
+            syncCurrentTableBillAndDraft()
         }
     }
 
@@ -541,20 +613,32 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 discountPercent = discountPercent.coerceIn(0.0, 100.0)
             )
             _cartItems.value = currentList
+            syncCurrentTableBillAndDraft()
         }
     }
 
     fun removeFromCart(productId: Long) {
         _cartItems.value = _cartItems.value.filter { it.product.id != productId }
+        syncCurrentTableBillAndDraft()
     }
 
     fun clearCart() {
+        val tableNum = _selectedTableNumber.value.trim()
         _cartItems.value = emptyList()
         _billDiscountPercent.value = 0.0
         _customerName.value = ""
         _customerPhone.value = ""
         _cashTendered.value = 0.0
         _paymentMethod.value = "CASH"
+        if (tableNum.isNotBlank()) {
+            _tableDrafts.remove(tableNum)
+            viewModelScope.launch(Dispatchers.IO) {
+                val table = repository.getTableByNumber(tableNum)
+                if (table != null) {
+                    repository.updateTableStatus(table.tableId, "AVAILABLE", "", 0.0)
+                }
+            }
+        }
     }
 
     fun startNewOrder(
@@ -566,27 +650,97 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         serverName: String = "",
         notes: String = ""
     ) {
-        clearCart()
+        saveCurrentTableDraft()
+        val tableNum = tableNumber.trim()
+        _selectedTableNumber.value = tableNum
+        _selectedOrderType.value = orderType.trim()
         _customerName.value = customerName.trim()
         _customerPhone.value = customerPhone.trim()
-        _selectedTableNumber.value = tableNumber.trim()
-        _selectedOrderType.value = orderType.trim()
         _guestCount.value = guestCount.coerceAtLeast(1)
         _serverName.value = serverName.trim()
         _orderNotes.value = notes.trim()
+        _billDiscountPercent.value = 0.0
+        _cartItems.value = emptyList()
 
-        if (tableNumber.isNotBlank() && orderType == "Dine-in") {
+        if (tableNum.isNotBlank() && orderType == "Dine-in") {
             viewModelScope.launch(Dispatchers.IO) {
-                val table = repository.getTableByNumber(tableNumber.trim())
+                val table = repository.getTableByNumber(tableNum)
                 if (table != null) {
                     val displayName = customerName.ifBlank { "Table ${table.tableNumber}" }
                     repository.updateTableStatus(
                         tableId = table.tableId,
                         status = "OCCUPIED",
                         guestName = displayName,
-                        billAmount = table.currentBillAmount
+                        billAmount = 0.0
                     )
                 }
+            }
+            saveCurrentTableDraft()
+        }
+    }
+
+    fun sendKotToKitchen(onSuccess: (() -> Unit)? = null) {
+        val tableNum = _selectedTableNumber.value.trim()
+        val items = _cartItems.value
+        if (items.isEmpty()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val table = if (tableNum.isNotBlank()) repository.getTableByNumber(tableNum) else null
+            val zone = table?.zone ?: "Club area"
+            val custName = _customerName.value.ifBlank { table?.currentGuestName?.ifBlank { "Table $tableNum" } ?: "Order #${100 + (System.currentTimeMillis() % 900)}" }
+            val phone = _customerPhone.value
+            val notes = _orderNotes.value
+            val total = items.sumOf { it.totalAmount }
+            val itemsSummary = items.joinToString(" ; ") { "${it.quantity}x ${it.product.name}" }
+
+            val activeKotsForTable = if (tableNum.isNotBlank()) {
+                repository.allKots.firstOrNull()?.filter {
+                    it.tableNumber.equals(tableNum, ignoreCase = true) &&
+                    it.status != "SERVED" && it.status != "CANCELLED"
+                } ?: emptyList()
+            } else emptyList()
+
+            if (activeKotsForTable.isNotEmpty()) {
+                val latest = activeKotsForTable.first()
+                val updatedKot = latest.copy(
+                    customerName = if (phone.isNotBlank()) "$custName ($phone)" else custName,
+                    itemsSummary = itemsSummary,
+                    specialNotes = if (notes.isNotBlank()) notes else latest.specialNotes
+                )
+                repository.updateKot(updatedKot)
+            } else {
+                val kotCount = repository.getKotCount()
+                val section = when {
+                    items.any { it.product.kitchenSection == "GRILL" } -> "GRILL"
+                    items.all { it.product.kitchenSection == "BAR" } -> "BAR"
+                    else -> "KITCHEN"
+                }
+                val kot = KitchenOrderTicket(
+                    kotNumber = "KOT-${101 + kotCount}",
+                    tableNumber = tableNum.ifBlank { "Takeaway" },
+                    zone = zone,
+                    customerName = if (phone.isNotBlank()) "$custName ($phone)" else custName,
+                    timestamp = System.currentTimeMillis(),
+                    status = "NEW",
+                    section = section,
+                    itemsSummary = itemsSummary,
+                    specialNotes = notes
+                )
+                repository.insertKot(kot)
+            }
+
+            if (table != null) {
+                repository.updateTableStatus(
+                    tableId = table.tableId,
+                    status = "OCCUPIED",
+                    guestName = custName,
+                    billAmount = total
+                )
+            }
+            saveCurrentTableDraft()
+
+            launch(Dispatchers.Main) {
+                onSuccess?.invoke()
             }
         }
     }
@@ -745,10 +899,17 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch(Dispatchers.IO) {
             val orderId = repository.completeSale(order, orderItems, items)
-            if (tableNum.isNotBlank() && orderTypeVal == "Dine-in") {
+            if (tableNum.isNotBlank()) {
+                _tableDrafts.remove(tableNum)
                 val table = repository.getTableByNumber(tableNum)
                 if (table != null) {
                     repository.vacateTable(table.tableId)
+                }
+                val kotsForTable = repository.allKots.firstOrNull()?.filter {
+                    it.tableNumber.equals(tableNum, ignoreCase = true) && it.status != "CANCELLED"
+                } ?: emptyList()
+                for (kot in kotsForTable) {
+                    repository.updateKotStatus(kot.kotId, "SERVED")
                 }
             }
             val completedOrderWithItems = OrderWithItems(

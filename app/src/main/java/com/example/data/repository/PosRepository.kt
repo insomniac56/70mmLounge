@@ -97,6 +97,14 @@ class PosRepository(private val dao: PosDao) {
         dao.updateKotCompletedItems(kotId, completedItems)
     }
 
+    suspend fun insertKot(kot: KitchenOrderTicket): Long {
+        return dao.insertKot(kot)
+    }
+
+    suspend fun getKotCount(): Int {
+        return dao.getKotCount()
+    }
+
     /**
      * Submits an order placed by customer at a Table via QR Code:
      * 1. Creates KOT for the Kitchen / Bar

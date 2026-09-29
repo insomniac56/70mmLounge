@@ -206,7 +206,7 @@ fun PosCheckoutScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
 
                         OutlinedTextField(
@@ -466,7 +466,7 @@ fun PosCheckoutScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
+                            Text("New Order", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, softWrap = false)
                         }
 
                         // Running table chips
@@ -900,13 +900,13 @@ fun PosCheckoutScreen(
         if (showNewOrderDialog) {
             NewOrderDialog(
                 allTables = allTables,
-                currentTableNumber = selectedTableNumber,
-                currentOrderType = selectedOrderType,
-                currentCustomerName = customerName,
-                currentCustomerPhone = customerPhone,
-                currentGuestCount = guestCount,
-                currentServerName = serverName,
-                currentNotes = orderNotes,
+                currentTableNumber = "",
+                currentOrderType = "Dine-in",
+                currentCustomerName = "",
+                currentCustomerPhone = "",
+                currentGuestCount = 2,
+                currentServerName = "",
+                currentNotes = "",
                 onDismiss = { showNewOrderDialog = false },
                 onStartOrder = { name, phone, table, orderType, pax, server, notes ->
                     viewModel.startNewOrder(
@@ -1337,6 +1337,7 @@ private fun CartCheckoutSheetContent(
     val taxTotal by viewModel.cartTaxTotal.collectAsStateWithLifecycle()
     val grandTotal by viewModel.cartGrandTotal.collectAsStateWithLifecycle()
 
+    val selectedTableNumber by viewModel.selectedTableNumber.collectAsStateWithLifecycle()
     val customerName by viewModel.customerName.collectAsStateWithLifecycle()
     val customerPhone by viewModel.customerPhone.collectAsStateWithLifecycle()
     val paymentMethod by viewModel.paymentMethod.collectAsStateWithLifecycle()
@@ -1344,6 +1345,7 @@ private fun CartCheckoutSheetContent(
 
     var showDiscountDialog by remember { mutableStateOf(false) }
     var showCustomerInputs by remember { mutableStateOf(customerName.isNotBlank() || customerPhone.isNotBlank()) }
+    var kotSentNotice by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -1359,16 +1361,33 @@ private fun CartCheckoutSheetContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text(
-                    text = "Order Cart",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Slate900
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (selectedTableNumber.isNotBlank()) "Table $selectedTableNumber Cart" else "Order Cart",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (selectedTableNumber.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            color = Emerald600.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "Running Table",
+                                color = Emerald600,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = "${cartItems.sumOf { it.quantity }} items selected",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate500
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -1381,7 +1400,7 @@ private fun CartCheckoutSheetContent(
                 }
 
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close Cart")
+                    Icon(Icons.Default.Close, contentDescription = "Close Cart", tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
         }
@@ -1471,7 +1490,8 @@ private fun CartCheckoutSheetContent(
         // Order Bill Summary
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Slate100),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
             shape = RoundedCornerShape(12.dp)
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -1480,8 +1500,8 @@ private fun CartCheckoutSheetContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Subtotal", style = MaterialTheme.typography.bodyMedium, color = Slate600)
-                    Text(CurrencyFormatter.format(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Slate900)
+                    Text("Subtotal", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(CurrencyFormatter.format(subtotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1496,7 +1516,7 @@ private fun CartCheckoutSheetContent(
                         Text(
                             "Bill Discount",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (totalDiscount > 0) Emerald600 else Slate600
+                            color = if (totalDiscount > 0) Emerald600 else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         TextButton(
@@ -1507,7 +1527,7 @@ private fun CartCheckoutSheetContent(
                                 text = if (billDiscountPercent > 0) "${billDiscountPercent.toInt()}% Edit" else "+ Add %",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Sky600
+                                color = Emerald600
                             )
                         }
                     }
@@ -1516,7 +1536,7 @@ private fun CartCheckoutSheetContent(
                         "- " + CurrencyFormatter.format(totalDiscount),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (totalDiscount > 0) Emerald600 else Slate500
+                        color = if (totalDiscount > 0) Emerald600 else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -1528,19 +1548,19 @@ private fun CartCheckoutSheetContent(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("GST Tax", style = MaterialTheme.typography.bodyMedium, color = Slate600)
+                        Text("GST Tax", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             "CGST ${CurrencyFormatter.format(taxTotal / 2)} + SGST ${CurrencyFormatter.format(taxTotal / 2)}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Slate500,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                             fontSize = 11.sp
                         )
                     }
-                    Text(CurrencyFormatter.format(taxTotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Slate900)
+                    Text(CurrencyFormatter.format(taxTotal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(color = Slate200)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Grand Total
@@ -1549,7 +1569,7 @@ private fun CartCheckoutSheetContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Grand Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Slate900)
+                    Text("Grand Total", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Text(CurrencyFormatter.format(grandTotal), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black, color = Emerald600)
                 }
             }
@@ -1562,7 +1582,7 @@ private fun CartCheckoutSheetContent(
             text = "Payment Method",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
-            color = Slate900
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -1753,9 +1773,43 @@ private fun CartCheckoutSheetContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        // Complete Sale Button
+        // Send KOT to Kitchen Button (for running / dine-in tables)
+        if (selectedTableNumber.isNotBlank()) {
+            Button(
+                onClick = {
+                    viewModel.sendKotToKitchen {
+                        kotSentNotice = true
+                    }
+                },
+                enabled = cartItems.isNotEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("send_kot_button"),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (kotSentNotice) Emerald600 else Amber500,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    if (kotSentNotice) Icons.Default.Check else Icons.Default.Restaurant,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (kotSentNotice) "KOT Sent to Kitchen! ✓" else "Send KOT to Kitchen",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+        }
+
+        // Complete Sale / Settle Bill Button
         Button(
             onClick = {
                 viewModel.completeCheckout {
@@ -1771,7 +1825,10 @@ private fun CartCheckoutSheetContent(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                text = "Complete Sale • ${CurrencyFormatter.format(grandTotal)}",
+                text = if (selectedTableNumber.isNotBlank())
+                    "Checkout Table $selectedTableNumber • ${CurrencyFormatter.format(grandTotal)}"
+                else
+                    "Complete Sale • ${CurrencyFormatter.format(grandTotal)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -1802,42 +1859,32 @@ private fun CartLineItemCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(0.8.dp, Slate200),
-        shape = RoundedCornerShape(10.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.product.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Slate900,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "${CurrencyFormatter.format(item.product.sellingPrice)} each",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
-                        fontSize = 11.sp
-                    )
-                    Text(
-                        text = "• GST ${item.product.gstRate.toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Sky600,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "${CurrencyFormatter.format(item.product.sellingPrice)} each",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
             }
 
             // Qty Stepper
@@ -1845,23 +1892,35 @@ private fun CartLineItemCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Slate100)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
             ) {
-                IconButton(onClick = onDecrement, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.Remove, contentDescription = "Decrease", modifier = Modifier.size(16.dp))
+                IconButton(onClick = onDecrement, modifier = Modifier.size(30.dp)) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = "Decrease",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
                 Text(
                     text = "${item.quantity}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(horizontal = 6.dp)
                 )
                 IconButton(
                     onClick = onIncrement,
                     enabled = item.quantity < item.product.stockQuantity,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(30.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Increase", modifier = Modifier.size(16.dp))
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Increase",
+                        tint = Emerald600,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
@@ -1872,11 +1931,16 @@ private fun CartLineItemCard(
                 text = CurrencyFormatter.format(item.totalAmount),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                color = Slate900
+                color = MaterialTheme.colorScheme.onSurface
             )
 
-            IconButton(onClick = onRemove, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Slate400, modifier = Modifier.size(18.dp))
+            IconButton(onClick = onRemove, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Remove",
+                    tint = Rose500,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -1895,11 +1959,11 @@ private fun PaymentMethodCard(
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Slate900 else MaterialTheme.colorScheme.surface
+            containerColor = if (isSelected) Emerald600 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         ),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isSelected) Slate900 else Slate200
+            if (isSelected) Emerald600 else MaterialTheme.colorScheme.outlineVariant
         ),
         shape = RoundedCornerShape(10.dp)
     ) {
@@ -1913,7 +1977,7 @@ private fun PaymentMethodCard(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isSelected) Color.White else Slate700,
+                tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -1921,7 +1985,7 @@ private fun PaymentMethodCard(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isSelected) Color.White else Slate800
+                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -1982,6 +2046,7 @@ private fun DiscountPickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     for (preset in presets) {
+                        val isPresetSelected = (customPercentInput == preset.toString())
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
@@ -1989,15 +2054,20 @@ private fun DiscountPickerDialog(
                                 .clickable {
                                     customPercentInput = preset.toString()
                                 },
-                            color = if (customPercentInput == preset.toString()) Slate900 else Slate100
+                            color = if (isPresetSelected) Emerald600 else MaterialTheme.colorScheme.surfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isPresetSelected) Emerald600 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = "${preset.toInt()}%",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = if (customPercentInput == preset.toString()) Color.White else Slate800,
+                                color = if (isPresetSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
-                                    .padding(vertical = 8.dp)
+                                    .padding(vertical = 10.dp)
                                     .fillMaxWidth(),
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
@@ -2030,9 +2100,13 @@ private fun DiscountPickerDialog(
                             val parsed = customPercentInput.toDoubleOrNull() ?: 0.0
                             onApply(parsed)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate900)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Emerald600,
+                            contentColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Apply")
+                        Text("Apply", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2325,7 +2399,13 @@ private fun NewOrderDialog(
     val zones = listOf("All") + allTables.map { it.zone }.distinct().filter { it.isNotBlank() }
     val filteredTables = if (selectedZone == "All") allTables else allTables.filter { it.zone.equals(selectedZone, ignoreCase = true) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = { /* ignore clicks outside */ },
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnClickOutside = false,
+            dismissOnBackPress = false
+        )
+    ) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2645,32 +2725,29 @@ private fun NewOrderDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = serverName,
-                        onValueChange = { serverName = it },
-                        label = { Text("Captain / Server") },
-                        placeholder = { Text("e.g. Captain 1") },
-                        leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = Slate500) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
-                    )
+                OutlinedTextField(
+                    value = serverName,
+                    onValueChange = { serverName = it },
+                    label = { Text("Captain / Server") },
+                    placeholder = { Text("e.g. Captain 1") },
+                    leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = Slate500) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                    OutlinedTextField(
-                        value = notes,
-                        onValueChange = { notes = it },
-                        label = { Text("Special Requests") },
-                        placeholder = { Text("e.g. Less spicy") },
-                        leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Slate500) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Special Requests / Notes") },
+                    placeholder = { Text("e.g. Less spicy, extra sauce") },
+                    leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Slate500) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
