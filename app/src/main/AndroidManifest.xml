@@ -59,6 +59,13 @@
                     android:host="order.70mmlounge.club"
                     android:pathPrefix="/order" />
             </intent-filter>
+            <!-- USB POS Printer Auto-Attach intent filter -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
         </activity>
 
         <provider
@@ -70,6 +77,24 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Background service for scanning connected USB / paired Bluetooth thermal printers -->
+        <service
+            android:name="com.example.util.PrinterDiscoveryService"
+            android:exported="false" />
+
+        <!-- Broadcast receiver for automatic hot-plug printer detection -->
+        <receiver
+            android:name="com.example.util.PrinterDeviceReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+                <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

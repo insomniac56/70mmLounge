@@ -384,116 +384,13 @@ object DatabaseSeeder {
             dao.insertAllTables(sampleTables)
         }
 
-        if (dao.getKotCount() == 0) {
-            val now = System.currentTimeMillis()
-            dao.insertAllKots(
-                listOf(
-                    KitchenOrderTicket(
-                        kotNumber = "KOT-101",
-                        tableNumber = "C-2",
-                        zone = "Club area",
-                        customerName = "Aman & Friends",
-                        timestamp = now - (8 * 60 * 1000),
-                        status = "PREPARING",
-                        section = "KITCHEN",
-                        itemsSummary = "1x Paneer Chilli Dry ; 2x Butter Naan ; 1x Dal Makhani",
-                        completedItems = "1x Paneer Chilli Dry",
-                        specialNotes = "Less spicy for Dal Makhani. Extra butter on Naan."
-                    ),
-                    KitchenOrderTicket(
-                        kotNumber = "KOT-102",
-                        tableNumber = "O-2",
-                        zone = "Outdoor",
-                        customerName = "Vikram",
-                        timestamp = now - (4 * 60 * 1000),
-                        status = "READY",
-                        section = "BAR",
-                        itemsSummary = "1x Virgin Mojito ; 1x Oreo Shake",
-                        completedItems = "1x Virgin Mojito ; 1x Oreo Shake",
-                        specialNotes = "Serve with ice cubes and paper straws."
-                    ),
-                    KitchenOrderTicket(
-                        kotNumber = "KOT-103",
-                        tableNumber = "C-3",
-                        zone = "Club area",
-                        customerName = "Rohan Party",
-                        timestamp = now - (2 * 60 * 1000),
-                        status = "NEW",
-                        section = "GRILL",
-                        itemsSummary = "1x Chicken Tikka ; 1x Tandoori Chicken Half ; 1x Harabhara Kebab",
-                        completedItems = "",
-                        specialNotes = "Crispy grill, serve mint chutney."
-                    )
-                )
-            )
+        // Clean up legacy demo orders and demo KOTs so app starts 100% clean & fresh
+        if (dao.getOrderCount() == 1) {
+            dao.deleteAllOrders()
+            dao.deleteAllOrderItems()
         }
-
-        if (dao.getOrderCount() == 0) {
-            val now = System.currentTimeMillis()
-            val cal = Calendar.getInstance()
-            cal.timeInMillis = now
-            cal.add(Calendar.HOUR_OF_DAY, -1)
-
-            val order1Id = dao.insertOrder(
-                SaleOrder(
-                    invoiceNumber = "INV-2026-0001",
-                    timestamp = cal.timeInMillis,
-                    customerName = "Table C-2",
-                    customerPhone = "+91 9876543210",
-                    paymentMethod = "ONLINE",
-                    subtotal = 1380.0,
-                    discountPercent = 0.0,
-                    discountAmount = 0.0,
-                    taxAmount = 69.0,
-                    totalAmount = 1449.0,
-                    totalCost = 550.0,
-                    netProfit = 830.0,
-                    tableNumber = "C-2",
-                    orderType = "DINE_IN",
-                    notes = "UPI Payment successful (Ref: UPI-98421)"
-                )
-            )
-
-            dao.insertOrderItems(
-                listOf(
-                    SaleOrderItem(
-                        orderId = order1Id,
-                        productId = 1,
-                        productName = "Paneer Chilli Dry",
-                        category = "Chinese",
-                        quantity = 1,
-                        unitPrice = 240.0,
-                        costPrice = 90.0,
-                        gstRate = 5.0,
-                        taxAmount = 12.0,
-                        totalAmount = 252.0
-                    ),
-                    SaleOrderItem(
-                        orderId = order1Id,
-                        productId = 2,
-                        productName = "Chicken Biryani",
-                        category = "Rice & Biryani",
-                        quantity = 2,
-                        unitPrice = 240.0,
-                        costPrice = 110.0,
-                        gstRate = 5.0,
-                        taxAmount = 24.0,
-                        totalAmount = 504.0
-                    ),
-                    SaleOrderItem(
-                        orderId = order1Id,
-                        productId = 3,
-                        productName = "Virgin Mojito",
-                        category = "Special Mocktails",
-                        quantity = 2,
-                        unitPrice = 170.0,
-                        costPrice = 60.0,
-                        gstRate = 5.0,
-                        taxAmount = 17.0,
-                        totalAmount = 357.0
-                    )
-                )
-            )
+        if (dao.getKotCount() <= 3) {
+            dao.deleteAllKots()
         }
     }
 }

@@ -116,6 +116,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleIncomingIntent(intent)
         CustomerHttpServer.start(this, viewModel.repository)
+        com.example.util.PrinterManager.init(this)
+        com.example.util.PrinterDiscoveryManager.startService(this)
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
             RetailPosTheme(darkTheme = isDarkMode) {

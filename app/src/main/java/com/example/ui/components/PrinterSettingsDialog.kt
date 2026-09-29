@@ -77,7 +77,9 @@ import com.example.ui.theme.Slate600
 import com.example.ui.theme.Slate700
 import com.example.ui.theme.Slate800
 import com.example.ui.theme.Slate900
+import com.example.util.PrinterDiscoveryManager
 import com.example.util.PrinterManager
+import com.example.util.PrinterPreferences
 import kotlinx.coroutines.launch
 
 @Composable
@@ -88,7 +90,7 @@ fun PrinterSettingsDialog(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var config by remember { mutableStateOf(PrinterManager.currentConfig) }
+    var config by remember { mutableStateOf(PrinterPreferences.loadConfig(context)) }
     var isTesting by remember { mutableStateOf(false) }
     var testResultMsg by remember { mutableStateOf("") }
 
@@ -186,11 +188,12 @@ fun PrinterSettingsDialog(
                             },
                             leadingIcon = {
                                 val icon = when (type) {
-                                    PrinterConnectionType.THERMAL_ESC_POS -> Icons.Default.Receipt
+                                    PrinterConnectionType.AUTO_DETECT -> Icons.Default.CheckCircle
+                                    PrinterConnectionType.USB -> Icons.Default.Usb
                                     PrinterConnectionType.BLUETOOTH -> Icons.Default.Bluetooth
                                     PrinterConnectionType.WIFI -> Icons.Default.Wifi
-                                    PrinterConnectionType.USB -> Icons.Default.Usb
                                     PrinterConnectionType.LAN -> Icons.Default.Lan
+                                    PrinterConnectionType.SYSTEM_PRINT -> Icons.Default.Print
                                 }
                                 Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
                             },
@@ -214,6 +217,205 @@ fun PrinterSettingsDialog(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         when (config.connectionType) {
+                            PrinterConnectionType.AUTO_DETECT -> {
+                                Text(
+                                    text = "Smart Auto-Detect (Rugtek / USB / Bluetooth)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate800
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Recommended for Rugtek POS terminal. The app automatically senses any connected USB thermal printer, internal POS device node (/dev/usb/lp0), or paired Bluetooth printer. 1-Click direct print without extra dialogs!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Slate600,
+                                    fontSize = 12.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                var hardwareSummary by remember { mutableStateOf(PrinterManager.getDetectedPrinterSummary(context)) }
+                                Surface(
+                                    color = Emerald100,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Emerald600, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column {
+                                                Text("Detected Hardware Status:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Emerald600)
+                                                Text(hardwareSummary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Slate900)
+                                            }
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                PrinterDiscoveryManager.scanAndStorePrinters(context)
+                                                hardwareSummary = PrinterManager.getDetectedPrinterSummary(context)
+                                                config = PrinterPreferences.loadConfig(context)
+                                                Toast.makeText(context, "Hardware scan complete: $hardwareSummary", Toast.LENGTH_SHORT).show()
+                                            },
+                                            shape = RoundedCornerShape(6.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Refresh, contentDescription = "Scan", modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Scan Now", fontSize = 11.sp)
+                                        }
+                                    }
+                                }
+                            }
+                            PrinterConnectionType.USB -> {
+                                Text(
+                                    text = "USB Direct POS Printer (Rugtek / Thermal)",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate800
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = config.usbDeviceName,
+                                    onValueChange = { config = config.copy(usbDeviceName = it) },
+                                    label = { Text("USB Printer Device Name / Filter") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                val usbList = remember { PrinterManager.getConnectedUsbPrinters(context) }
+                                if (usbList.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Connected USB Devices (Tap to select):",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Emerald600
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        usbList.forEach { info ->
+                                            Surface(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .border(1.dp, Emerald600, RoundedCornerShape(6.dp))
+                                                    .clickable {
+                                                        config = config.copy(usbDeviceName = info.name)
+                                                        if (!info.hasPermission) {
+                                                            val usbMgr = context.getSystemService(android.content.Context.USB_SERVICE) as? android.hardware.usb.UsbManager
+                                                            usbMgr?.let { PrinterManager.requestUsbPermission(context, it, info.device) }
+                                                        }
+                                                    },
+                                                color = Emerald100
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.Usb, contentDescription = null, modifier = Modifier.size(16.dp), tint = Emerald600)
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(info.name, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                    }
+                                                    Text(
+                                                        if (info.hasPermission) "Authorized ✓" else "Request Permission",
+                                                        fontSize = 11.sp,
+                                                        color = if (info.hasPermission) Emerald600 else Slate600
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Connects directly via USB Host API and Linux hardware nodes (/dev/usb/lp0).",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Slate500,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            PrinterConnectionType.BLUETOOTH -> {
+                                Text(
+                                    text = "Bluetooth POS Printer",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Slate800
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = config.bluetoothDeviceName,
+                                    onValueChange = { config = config.copy(bluetoothDeviceName = it) },
+                                    label = { Text("Paired Bluetooth Printer Name / MAC") },
+                                    placeholder = { Text("POS-Printer / MPT-II / RPP02N") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+
+                                val pairedList = remember { PrinterManager.getPairedBluetoothPrinters() }
+                                if (pairedList.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Detected Paired Devices (Tap to select):",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Emerald600
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        pairedList.forEach { (devName, devMac) ->
+                                            val isChosen = config.bluetoothDeviceAddress == devMac || config.bluetoothDeviceName == devName
+                                            Surface(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .border(
+                                                        1.dp,
+                                                        if (isChosen) Emerald600 else Slate400,
+                                                        RoundedCornerShape(6.dp)
+                                                    )
+                                                    .clickable {
+                                                        config = config.copy(
+                                                            bluetoothDeviceName = devName,
+                                                            bluetoothDeviceAddress = devMac
+                                                        )
+                                                    },
+                                                color = if (isChosen) Emerald100 else Slate200
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(12.dp), tint = Emerald600)
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(devName, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Pair your Bluetooth thermal printer in Android Bluetooth Settings first, then select or enter its name here.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Slate500,
+                                    fontSize = 11.sp
+                                )
+                            }
                             PrinterConnectionType.WIFI, PrinterConnectionType.LAN -> {
                                 Text(
                                     text = if (config.connectionType == PrinterConnectionType.WIFI) "Wi-Fi Network Printer IP" else "LAN Ethernet Printer IP",
@@ -254,65 +456,16 @@ fun PrinterSettingsDialog(
                                     fontSize = 11.sp
                                 )
                             }
-                            PrinterConnectionType.BLUETOOTH -> {
+                            PrinterConnectionType.SYSTEM_PRINT -> {
                                 Text(
-                                    text = "Bluetooth POS Printer",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Slate800
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                OutlinedTextField(
-                                    value = config.bluetoothDeviceName,
-                                    onValueChange = { config = config.copy(bluetoothDeviceName = it) },
-                                    label = { Text("Paired Bluetooth Printer Name / MAC") },
-                                    placeholder = { Text("POS-Printer / MPT-II / RPP02N") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Pair your Bluetooth thermal printer in Android Bluetooth Settings first, then select or enter its name here.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Slate500,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            PrinterConnectionType.USB -> {
-                                Text(
-                                    text = "USB Direct POS Printer",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Slate800
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                OutlinedTextField(
-                                    value = config.usbDeviceName,
-                                    onValueChange = { config = config.copy(usbDeviceName = it) },
-                                    label = { Text("USB Printer Device Name") },
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Connect USB cable or USB OTG adapter directly to POS terminal.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Slate500,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            PrinterConnectionType.THERMAL_ESC_POS -> {
-                                Text(
-                                    text = "Universal ESC/POS Thermal Printer",
+                                    text = "Android System Print Dialog",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Slate800
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Standard ESC/POS thermal command mode. Compatible with any thermal receipt printer (58mm / 80mm) and Android System Print Services.",
+                                    text = "Opens the standard Android print preview window. Useful if you want to Save as PDF or use Mopria/Google Cloud Print services.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Slate600,
                                     fontSize = 12.sp
@@ -415,6 +568,24 @@ fun PrinterSettingsDialog(
                                 colors = SwitchDefaults.colors(checkedThumbColor = Sky600, checkedTrackColor = Sky100)
                             )
                         }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp), color = Slate200)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Thermal Auto-Cut Paper (ऑटो-कट)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                Text("Send ESC/POS cut paper command (GS V 1) after printing bill or KOT", fontSize = 11.sp, color = Slate500)
+                            }
+                            Switch(
+                                checked = config.autoCutPaper,
+                                onCheckedChange = { config = config.copy(autoCutPaper = it) },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Emerald600, checkedTrackColor = Emerald100)
+                            )
+                        }
                     }
                 }
 
@@ -457,6 +628,7 @@ fun PrinterSettingsDialog(
 
                     Button(
                         onClick = {
+                            PrinterPreferences.saveConfig(context, config)
                             PrinterManager.currentConfig = config
                             Toast.makeText(context, "Printer settings saved!", Toast.LENGTH_SHORT).show()
                             onDismiss()

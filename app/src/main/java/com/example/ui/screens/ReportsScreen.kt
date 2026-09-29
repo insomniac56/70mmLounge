@@ -12,14 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Button
@@ -30,6 +35,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -38,6 +44,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +61,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.GstSlabSummary
 import com.example.data.model.ReportTimeRange
 import com.example.data.model.SalesSummary
+import com.example.ui.theme.Amber100
+import com.example.ui.theme.Amber500
 import com.example.ui.theme.Emerald100
 import com.example.ui.theme.Emerald50
 import com.example.ui.theme.Emerald600
@@ -67,6 +78,7 @@ import com.example.ui.theme.Slate800
 import com.example.ui.theme.Slate900
 import com.example.ui.viewmodel.PosViewModel
 import com.example.util.CurrencyFormatter
+import com.example.util.DailySummaryManager
 import com.example.util.ExcelExporter
 
 @Composable
@@ -85,44 +97,67 @@ fun ReportsScreen(
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // Top Action Bar: Title & Excel Export
+        // Top Action Bar: Title & WhatsApp Daily Report & Excel Export
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Sales & Tax Reports",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Slate900
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Real-time GST, profit & performance",
+                    text = "Real-time GST, profit & closing summary",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate500
+                    color = Slate400
                 )
             }
 
-            // Export to Excel / CSV Button
-            Button(
-                onClick = {
-                    ExcelExporter.shareExcelReport(context, salesSummary)
-                },
-                modifier = Modifier.testTag("export_excel_button"),
-                colors = ButtonDefaults.buttonColors(containerColor = Slate900),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.FileDownload,
-                    contentDescription = "Export Excel",
-                    modifier = Modifier.size(18.dp),
-                    tint = Color.White
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Excel Report", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                // WhatsApp to Owner Button (8987477773)
+                Button(
+                    onClick = {
+                        DailySummaryManager.sendSummaryToWhatsApp(context, salesSummary)
+                    },
+                    modifier = Modifier.testTag("whatsapp_summary_top_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Chat,
+                        contentDescription = "WhatsApp Summary",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("WhatsApp", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                }
+
+                // Export to Excel / CSV Button
+                OutlinedButton(
+                    onClick = {
+                        ExcelExporter.shareExcelReport(context, salesSummary)
+                    },
+                    modifier = Modifier.testTag("export_excel_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FileDownload,
+                        contentDescription = "Export Excel",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Excel", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
 
@@ -131,15 +166,15 @@ fun ReportsScreen(
         // Time Range Tabs: Today (Daily), Week, Month, All
         TabRow(
             selectedTabIndex = ranges.indexOf(selectedRange),
-            containerColor = Slate100,
-            contentColor = Slate900,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp)),
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[ranges.indexOf(selectedRange)]),
-                    color = Slate900,
+                    color = Emerald600,
                     height = 3.dp
                 )
             },
@@ -160,7 +195,7 @@ fun ReportsScreen(
                             },
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp,
-                            color = if (isSelected) Slate900 else Slate600
+                            color = if (isSelected) Emerald600 else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     modifier = Modifier.testTag("report_tab_${range.name.lowercase()}")
@@ -178,6 +213,11 @@ fun ReportsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
+            // Daily Closing Summary & WhatsApp to Owner (8987477773)
+            item {
+                DailyClosingWhatsAppCard(summary = salesSummary)
+            }
+
             // KPI Financial Metrics Grid
             item {
                 KpiMetricsGrid(summary = salesSummary)
@@ -228,7 +268,7 @@ private fun KpiMetricsGrid(summary: SalesSummary) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Gross Revenue", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                        Text("Gross Revenue", style = MaterialTheme.typography.labelSmall, color = Slate400)
                         Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Emerald600, modifier = Modifier.size(16.dp))
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -236,13 +276,13 @@ private fun KpiMetricsGrid(summary: SalesSummary) {
                         text = CurrencyFormatter.format(summary.grossSales),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Black,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${summary.orderCount} orders • AOV ${CurrencyFormatter.format(summary.averageOrderValue)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
+                        color = Slate400,
                         fontSize = 11.sp
                     )
                 }
@@ -298,19 +338,19 @@ private fun KpiMetricsGrid(summary: SalesSummary) {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("GST Tax Collected", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                    Text("GST Tax Collected", style = MaterialTheme.typography.labelSmall, color = Slate400)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = CurrencyFormatter.format(summary.totalGst),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "CGST: ${CurrencyFormatter.format(summary.totalGst / 2)} | SGST: ${CurrencyFormatter.format(summary.totalGst / 2)}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
+                        color = Slate400,
                         fontSize = 11.sp
                     )
                 }
@@ -325,20 +365,20 @@ private fun KpiMetricsGrid(summary: SalesSummary) {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Discounts Given", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                    Text("Discounts Given", style = MaterialTheme.typography.labelSmall, color = Slate400)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = CurrencyFormatter.format(summary.totalDiscounts),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     val discountPercent = if (summary.grossSales > 0) (summary.totalDiscounts / (summary.grossSales + summary.totalDiscounts)) * 100.0 else 0.0
                     Text(
                         text = "Avg ${String.format("%.1f", discountPercent)}% off gross",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
+                        color = Slate400,
                         fontSize = 11.sp
                     )
                 }
@@ -372,7 +412,7 @@ private fun GstTaxAnalysisCard(
                         text = "GST Tax Slabs Breakdown",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -380,7 +420,7 @@ private fun GstTaxAnalysisCard(
                     text = "Total: ${CurrencyFormatter.format(totalTax)}",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Sky600
+                    color = Emerald600
                 )
             }
 
@@ -391,14 +431,14 @@ private fun GstTaxAnalysisCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Slate100)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .padding(horizontal = 8.dp, vertical = 6.dp)
             ) {
-                Text("Slab", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Slate700, modifier = Modifier.weight(0.8f))
-                Text("Taxable", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Slate700, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
-                Text("CGST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Slate700, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
-                Text("SGST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Slate700, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
-                Text("Total Tax", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Slate700, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
+                Text("Slab", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(0.8f))
+                Text("Taxable", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
+                Text("CGST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+                Text("SGST", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
+                Text("Total Tax", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, modifier = Modifier.weight(1.2f))
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -422,28 +462,28 @@ private fun GstTaxAnalysisCard(
                             text = "${slab.rate.toInt()}%",
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
-                            color = Slate900,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(0.8f)
                         )
                         Text(
                             text = CurrencyFormatter.format(slab.taxableAmount),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.End,
-                            color = Slate800,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1.2f)
                         )
                         Text(
                             text = CurrencyFormatter.format(slab.cgstAmount),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.End,
-                            color = Slate600,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = CurrencyFormatter.format(slab.sgstAmount),
                             style = MaterialTheme.typography.bodySmall,
                             textAlign = TextAlign.End,
-                            color = Slate600,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
@@ -455,7 +495,7 @@ private fun GstTaxAnalysisCard(
                             modifier = Modifier.weight(1.2f)
                         )
                     }
-                    HorizontalDivider(color = Slate100, thickness = 0.5.dp)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
                 }
             }
         }
@@ -483,7 +523,7 @@ private fun PaymentBreakdownCard(summary: SalesSummary) {
                 text = "Payment Modes Distribution",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = Slate900
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -494,7 +534,7 @@ private fun PaymentBreakdownCard(summary: SalesSummary) {
                     .fillMaxWidth()
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Slate200)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 if (cashPct > 0) {
                     Box(
@@ -517,7 +557,7 @@ private fun PaymentBreakdownCard(summary: SalesSummary) {
                         modifier = Modifier
                             .fillMaxSize()
                             .weight(upiPct)
-                            .background(Slate900)
+                            .background(Color(0xFF8B5CF6))
                     )
                 }
             }
@@ -531,7 +571,7 @@ private fun PaymentBreakdownCard(summary: SalesSummary) {
             ) {
                 PaymentStatPill("Cash", CurrencyFormatter.format(pb.cashTotal), pb.cashCount, Emerald600)
                 PaymentStatPill("Card", CurrencyFormatter.format(pb.cardTotal), pb.cardCount, Sky600)
-                PaymentStatPill("UPI / QR", CurrencyFormatter.format(pb.upiTotal), pb.upiCount, Slate900)
+                PaymentStatPill("UPI / QR", CurrencyFormatter.format(pb.upiTotal), pb.upiCount, Color(0xFF8B5CF6))
             }
         }
     }
@@ -548,10 +588,10 @@ private fun PaymentStatPill(mode: String, amount: String, count: Int, dotColor: 
                     .background(dotColor)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(mode, style = MaterialTheme.typography.labelSmall, color = Slate600)
+            Text(mode, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(modifier = Modifier.height(2.dp))
-        Text(amount, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Slate900)
+        Text(amount, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Text("$count txns", style = MaterialTheme.typography.labelSmall, color = Slate400, fontSize = 10.sp)
     }
 }
@@ -570,7 +610,7 @@ private fun CategorySalesCard(categories: List<com.example.data.model.CategorySa
                 text = "Sales by Category",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
-                color = Slate900
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -588,13 +628,13 @@ private fun CategorySalesCard(categories: List<com.example.data.model.CategorySa
                                 text = cat.category,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Medium,
-                                color = Slate800
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "${CurrencyFormatter.format(cat.totalRevenue)} (${String.format("%.1f", cat.percentageOfSales)}%)",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate900
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Spacer(modifier = Modifier.height(3.dp))
@@ -604,8 +644,8 @@ private fun CategorySalesCard(categories: List<com.example.data.model.CategorySa
                                 .fillMaxWidth()
                                 .height(5.dp)
                                 .clip(RoundedCornerShape(3.dp)),
-                            color = Slate900,
-                            trackColor = Slate100
+                            color = Emerald600,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
                 }
@@ -633,9 +673,9 @@ private fun TopSellingProductsCard(products: List<com.example.data.model.TopSell
                     text = "Top Selling Menu Items",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = Slate900
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Icon(Icons.Default.Assessment, contentDescription = null, tint = Slate500, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Assessment, contentDescription = null, tint = Slate400, modifier = Modifier.size(18.dp))
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -653,7 +693,7 @@ private fun TopSellingProductsCard(products: List<com.example.data.model.TopSell
                         Surface(
                             modifier = Modifier.size(22.dp),
                             shape = RoundedCornerShape(6.dp),
-                            color = if (index < 3) Slate900 else Slate100
+                            color = if (index < 3) Emerald600 else MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
@@ -661,7 +701,7 @@ private fun TopSellingProductsCard(products: List<com.example.data.model.TopSell
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (index < 3) Color.White else Slate700
+                                    color = if (index < 3) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -673,12 +713,12 @@ private fun TopSellingProductsCard(products: List<com.example.data.model.TopSell
                                 text = product.productName,
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Slate900
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "${product.category} • ${product.quantitySold} units sold",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Slate500,
+                                color = Slate400,
                                 fontSize = 11.sp
                             )
                         }
@@ -691,8 +731,204 @@ private fun TopSellingProductsCard(products: List<com.example.data.model.TopSell
                         )
                     }
                     if (index < products.size - 1) {
-                        HorizontalDivider(color = Slate100, thickness = 0.5.dp)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyClosingWhatsAppCard(summary: SalesSummary) {
+    val context = LocalContext.current
+    var showPreview by remember { mutableStateOf(false) }
+
+    val cashAmount = summary.paymentBreakdown.cashTotal
+    val upiAmount = summary.paymentBreakdown.upiTotal
+    val cardAmount = summary.paymentBreakdown.cardTotal
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.2.dp, Emerald600.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(38.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = Emerald600
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Daily Closing WhatsApp & SMS Summary",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Auto Day-End Report to Owner: ${DailySummaryManager.OWNER_WHATSAPP_NUMBER}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Emerald600,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Quick Payment Breakdown Chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Total Sales
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    color = Emerald50,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Gross Sales", fontSize = 10.sp, color = Slate600, fontWeight = FontWeight.Medium)
+                        Text(CurrencyFormatter.format(summary.grossSales), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Emerald600)
+                    }
+                }
+                // Cash
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    color = Slate100,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Cash (कैश)", fontSize = 10.sp, color = Slate600, fontWeight = FontWeight.Medium)
+                        Text(CurrencyFormatter.format(cashAmount), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Slate900)
+                    }
+                }
+                // UPI
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    color = Sky100,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("UPI (यूपीआई)", fontSize = 10.sp, color = Slate600, fontWeight = FontWeight.Medium)
+                        Text(CurrencyFormatter.format(upiAmount), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Sky600)
+                    }
+                }
+                // Card
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    color = Amber100,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Card (कार्ड)", fontSize = 10.sp, color = Slate600, fontWeight = FontWeight.Medium)
+                        Text(CurrencyFormatter.format(cardAmount), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Amber500)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Buttons Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        DailySummaryManager.sendSummaryToWhatsApp(context, summary)
+                    },
+                    modifier = Modifier.weight(1.5f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600, contentColor = Color.White),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("WhatsApp (8987477773)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        DailySummaryManager.sendSummaryToSms(context, summary)
+                    },
+                    modifier = Modifier.weight(0.85f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("SMS", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        DailySummaryManager.copySummaryToClipboard(context, summary)
+                    },
+                    modifier = Modifier.weight(0.85f),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Copy", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                }
+            }
+
+            // Preview Message Accordion
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPreview = !showPreview }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (showPreview) "Hide Message Preview ▲" else "Preview Daily Closing Message ▼",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Slate500,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            if (showPreview) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Slate100,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = DailySummaryManager.buildDailySummaryMessage(summary),
+                        modifier = Modifier.padding(10.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        color = Slate800
+                    )
                 }
             }
         }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- USB Printer Class 7 (Standard POS Thermal Printers) -->
+    <usb-device class="7" />
+    <!-- Vendor-specific POS thermal printer controllers -->
+    <usb-device class="255" />
+    <usb-device class="0" />
+</resources>

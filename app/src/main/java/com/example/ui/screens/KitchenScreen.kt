@@ -62,6 +62,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.data.model.KitchenOrderTicket
+import com.example.util.KotVoiceAnnouncer
 import com.example.util.PrinterManager
 import kotlinx.coroutines.launch
 import com.example.ui.theme.Amber100
@@ -114,6 +116,15 @@ fun KitchenScreen(
     val activeKots by viewModel.activeKots.collectAsStateWithLifecycle()
     val allKots by viewModel.allKots.collectAsStateWithLifecycle()
     val isAudioEnabled by viewModel.isKitchenAudioEnabled.collectAsStateWithLifecycle()
+    val isKotVoiceEnabled by viewModel.isKotVoiceEnabled.collectAsStateWithLifecycle()
+
+    // Initialize Hindi Voice Announcer and bind to lifecycle
+    val voiceAnnouncer = remember(context) { KotVoiceAnnouncer(context) }
+    DisposableEffect(voiceAnnouncer) {
+        onDispose {
+            voiceAnnouncer.shutdown()
+        }
+    }
 
     var selectedTab by remember { mutableStateOf(0) } // 0: Active, 1: Ready, 2: History
     var sectionFilter by remember { mutableStateOf("All") } // "All", "KITCHEN", "BAR", "GRILL"
@@ -128,14 +139,33 @@ fun KitchenScreen(
         }
     }
 
-    // Audio chime on new incoming tickets
+    // Real-time Event Listener for instant Hindi Voice Table Alerts
+    LaunchedEffect(Unit) {
+        viewModel.kotAlertFlow.collect { alertEvent ->
+            if (isKotVoiceEnabled) {
+                voiceAnnouncer.announceKot(
+                    areaName = alertEvent.areaName,
+                    tableNumber = alertEvent.tableNumber,
+                    isAddon = alertEvent.isAddon
+                )
+            } else if (isAudioEnabled) {
+                voiceAnnouncer.playKitchenChime()
+            }
+        }
+    }
+
+    // Audio chime / voice on new incoming tickets fallback (from database sync)
     var previousKotCount by remember { mutableStateOf(activeKots.size) }
     LaunchedEffect(activeKots.size) {
-        if (activeKots.size > previousKotCount && isAudioEnabled) {
-            try {
-                val toneGen = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
-                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 250)
-            } catch (_: Exception) { }
+        if (activeKots.size > previousKotCount && previousKotCount > 0) {
+            val newest = activeKots.maxByOrNull { it.timestamp }
+            if (newest != null) {
+                if (isKotVoiceEnabled) {
+                    voiceAnnouncer.announceKot(newest.zone, newest.tableNumber, isAddon = false)
+                } else if (isAudioEnabled) {
+                    voiceAnnouncer.playKitchenChime()
+                }
+            }
         }
         previousKotCount = activeKots.size
     }
@@ -190,21 +220,68 @@ fun KitchenScreen(
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Sound toggle button
-                IconButton(
-                    onClick = { viewModel.toggleKitchenAudio() },
-                    modifier = Modifier.size(36.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Hindi Voice Announcement Toggle Chip
+                Surface(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { viewModel.toggleKotVoice() }
+                        .border(
+                            1.dp,
+                            if (isKotVoiceEnabled) Emerald600 else Slate400,
+                            RoundedCornerShape(8.dp)
+                        ),
+                    color = if (isKotVoiceEnabled) Emerald600.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                 ) {
-                    Icon(
-                        imageVector = if (isAudioEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
-                        contentDescription = "Toggle Audio Chime",
-                        tint = if (isAudioEnabled) Emerald600 else Slate400,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isKotVoiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
+                            contentDescription = "Hindi Voice Alert",
+                            tint = if (isKotVoiceEnabled) Emerald600 else Slate500,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isKotVoiceEnabled) "Hindi Voice: ON" else "Voice: OFF",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isKotVoiceEnabled) Emerald600 else Slate500,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
+                // Test Voice Button
+                OutlinedButton(
+                    onClick = {
+                        voiceAnnouncer.announceKot(
+                            areaName = "Main Dining",
+                            tableNumber = "5",
+                            isAddon = false
+                        )
+                    },
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Test Voice",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
                 Surface(
                     modifier = Modifier.clip(RoundedCornerShape(8.dp)),
@@ -386,7 +463,7 @@ fun KitchenScreen(
                             text = title,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                             fontSize = 13.sp,
-                            color = if (isSelected) Slate900 else Slate600
+                            color = if (isSelected) Emerald600 else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     },
                     modifier = Modifier.testTag("kot_tab_$index")
@@ -409,15 +486,15 @@ fun KitchenScreen(
                     onClick = { sectionFilter = sec },
                     label = { Text(sec) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Slate900,
+                        selectedContainerColor = Emerald600,
                         selectedLabelColor = Color.White,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        labelColor = Slate700
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     border = FilterChipDefaults.filterChipBorder(
                         enabled = true,
                         selected = isSelected,
-                        borderColor = if (isSelected) Slate900 else Slate200
+                        borderColor = if (isSelected) Emerald600 else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     ),
                     shape = RoundedCornerShape(16.dp)
                 )
@@ -621,7 +698,7 @@ private fun KitchenTicketCard(
                     text = "TABLE ${kot.tableNumber} • ${kot.zone} (${kot.customerName})",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Slate800
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -740,7 +817,7 @@ private fun KitchenTicketCard(
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (isPending) FontWeight.Bold else FontWeight.Normal,
                                         textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                        color = if (isCompleted) Slate400 else Slate900
+                                        color = if (isCompleted) Slate400 else MaterialTheme.colorScheme.onSurface
                                     )
                                     if (isPending) {
                                         Text(
@@ -819,19 +896,20 @@ private fun KitchenTicketCard(
                 }
             }
 
-            // Special Instructions Note
+            // Special Instructions Note (Green color for Chef Notes)
             if (kot.specialNotes.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp)),
-                    color = Amber100
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(1.dp, Emerald600.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                    color = Emerald600.copy(alpha = 0.15f)
                 ) {
                     Text(
                         text = "Chef Notes: ${kot.specialNotes}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Amber500,
+                        color = Color(0xFF10B981),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                     )

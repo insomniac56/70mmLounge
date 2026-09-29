@@ -1,7 +1,16 @@
 package com.example.util
 
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
+import android.content.Intent
+import android.hardware.usb.UsbConstants
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbDeviceConnection
+import android.hardware.usb.UsbEndpoint
+import android.hardware.usb.UsbInterface
+import android.hardware.usb.UsbManager
+import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
@@ -19,6 +28,7 @@ import com.example.data.model.ThermalPaperWidth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -27,9 +37,25 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class UsbPrinterInfo(
+    val name: String,
+    val manufacturer: String,
+    val vendorId: Int,
+    val productId: Int,
+    val hasPermission: Boolean,
+    val device: UsbDevice
+)
+
 object PrinterManager {
 
     var currentConfig: PrinterConfig = PrinterConfig()
+
+    /**
+     * Initializes the printer configuration from persistent preferences.
+     */
+    fun init(context: Context) {
+        currentConfig = PrinterPreferences.loadConfig(context)
+    }
 
     // ESC/POS Command Constants
     private val ESC: Byte = 0x1B
@@ -49,7 +75,7 @@ object PrinterManager {
 
     /**
      * Prints customer receipt using the currently active printer configuration.
-     * Also falls back to Android PrintManager for universal printing on any device.
+     * Auto-detects connected printer (Rugtek USB / Bluetooth / Direct POS Node) or falls back to system print.
      */
     suspend fun printReceipt(
         context: Context,
@@ -57,43 +83,71 @@ object PrinterManager {
         config: PrinterConfig = currentConfig,
         onComplete: (Boolean, String) -> Unit = { _, _ -> }
     ) {
-        val bytes = generateReceiptEscPos(orderWithItems, config)
-        val textSlip = generateReceiptPlainText(orderWithItems, config.paperWidth)
+        val effectiveConfig = if (config == currentConfig) {
+            PrinterPreferences.loadConfig(context)
+        } else {
+            config
+        }
+        val bytes = generateReceiptEscPos(orderWithItems, effectiveConfig)
+        val textSlip = generateReceiptPlainText(orderWithItems, effectiveConfig.paperWidth)
 
         withContext(Dispatchers.IO) {
-            when (config.connectionType) {
-                PrinterConnectionType.WIFI, PrinterConnectionType.LAN -> {
-                    val result = sendBytesToSocket(config.ipAddress, config.port, bytes)
+            when (effectiveConfig.connectionType) {
+                PrinterConnectionType.AUTO_DETECT -> {
+                    autoDetectAndPrint(
+                        context = context,
+                        data = bytes,
+                        textSlip = textSlip,
+                        title = "Receipt-${orderWithItems.order.invoiceNumber}",
+                        onComplete = onComplete
+                    )
+                }
+                PrinterConnectionType.USB -> {
+                    val result = sendBytesToUsb(context, effectiveConfig.usbDeviceName, bytes)
                     withContext(Dispatchers.Main) {
                         if (result.first) {
-                            Toast.makeText(context, "Printed to ${config.connectionType.displayName} (${config.ipAddress})", Toast.LENGTH_SHORT).show()
-                            onComplete(true, "Printed successfully")
+                            Toast.makeText(context, "USB Print: ${result.second}", Toast.LENGTH_SHORT).show()
+                            onComplete(true, result.second)
                         } else {
-                            // If socket fails, open system print dialog as reliable fallback
+                            Toast.makeText(context, "${result.second}. Fallback to Print dialog...", Toast.LENGTH_SHORT).show()
                             openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
                             onComplete(false, result.second)
                         }
                     }
                 }
                 PrinterConnectionType.BLUETOOTH -> {
-                    // Try bluetooth or fallback
+                    val result = sendBytesToBluetooth(
+                        context = context,
+                        deviceAddressOrName = effectiveConfig.bluetoothDeviceAddress.ifBlank { effectiveConfig.bluetoothDeviceName },
+                        data = bytes
+                    )
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "Bluetooth Thermal Print sent to ${config.bluetoothDeviceName}", Toast.LENGTH_SHORT).show()
-                        openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
-                        onComplete(true, "Sent to Bluetooth Printer")
+                        if (result.first) {
+                            Toast.makeText(context, "Thermal Print: ${result.second} (Auto-cut sent)", Toast.LENGTH_SHORT).show()
+                            onComplete(true, result.second)
+                        } else {
+                            Toast.makeText(context, "${result.second}. Fallback to Print dialog...", Toast.LENGTH_SHORT).show()
+                            openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
+                            onComplete(false, result.second)
+                        }
                     }
                 }
-                PrinterConnectionType.USB -> {
+                PrinterConnectionType.WIFI, PrinterConnectionType.LAN -> {
+                    val result = sendBytesToSocket(effectiveConfig.ipAddress, effectiveConfig.port, bytes)
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "USB Thermal Print sent to ${config.usbDeviceName}", Toast.LENGTH_SHORT).show()
-                        openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
-                        onComplete(true, "Sent to USB POS Printer")
+                        if (result.first) {
+                            Toast.makeText(context, "Printed to ${effectiveConfig.connectionType.displayName} (${effectiveConfig.ipAddress})", Toast.LENGTH_SHORT).show()
+                            onComplete(true, "Printed successfully")
+                        } else {
+                            openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
+                            onComplete(false, result.second)
+                        }
                     }
                 }
-                PrinterConnectionType.THERMAL_ESC_POS -> {
+                PrinterConnectionType.SYSTEM_PRINT -> {
                     withContext(Dispatchers.Main) {
                         openSystemPrintDialog(context, "Receipt-${orderWithItems.order.invoiceNumber}", textSlip)
-                        onComplete(true, "Sent to ESC/POS Thermal Printer")
+                        onComplete(true, "Sent to Android System Print dialog")
                     }
                 }
             }
@@ -109,11 +163,49 @@ object PrinterManager {
         config: PrinterConfig = currentConfig,
         onComplete: (Boolean, String) -> Unit = { _, _ -> }
     ) {
+        val bytes = generateKotEscPos(kot, config)
         val textSlip = generateKotPlainText(kot, config.paperWidth)
+
         withContext(Dispatchers.IO) {
             when (config.connectionType) {
+                PrinterConnectionType.AUTO_DETECT -> {
+                    autoDetectAndPrint(
+                        context = context,
+                        data = bytes,
+                        textSlip = textSlip,
+                        title = "KOT-${kot.kotNumber}",
+                        onComplete = onComplete
+                    )
+                }
+                PrinterConnectionType.USB -> {
+                    val result = sendBytesToUsb(context, config.usbDeviceName, bytes)
+                    withContext(Dispatchers.Main) {
+                        if (result.first) {
+                            Toast.makeText(context, "USB KOT: ${result.second}", Toast.LENGTH_SHORT).show()
+                            onComplete(true, result.second)
+                        } else {
+                            openSystemPrintDialog(context, "KOT-${kot.kotNumber}", textSlip)
+                            onComplete(false, result.second)
+                        }
+                    }
+                }
+                PrinterConnectionType.BLUETOOTH -> {
+                    val result = sendBytesToBluetooth(
+                        context = context,
+                        deviceAddressOrName = config.bluetoothDeviceAddress.ifBlank { config.bluetoothDeviceName },
+                        data = bytes
+                    )
+                    withContext(Dispatchers.Main) {
+                        if (result.first) {
+                            Toast.makeText(context, "KOT Printed via Bluetooth (Auto-cut sent)", Toast.LENGTH_SHORT).show()
+                            onComplete(true, "KOT printed via Bluetooth")
+                        } else {
+                            openSystemPrintDialog(context, "KOT-${kot.kotNumber}", textSlip)
+                            onComplete(false, result.second)
+                        }
+                    }
+                }
                 PrinterConnectionType.WIFI, PrinterConnectionType.LAN -> {
-                    val bytes = generateKotEscPos(kot, config)
                     val result = sendBytesToSocket(config.ipAddress, config.port, bytes)
                     withContext(Dispatchers.Main) {
                         if (result.first) {
@@ -121,16 +213,90 @@ object PrinterManager {
                             onComplete(true, "KOT printed")
                         } else {
                             openSystemPrintDialog(context, "KOT-${kot.kotNumber}", textSlip)
-                            onComplete(true, "KOT sent to system printer")
+                            onComplete(false, result.second)
                         }
                     }
                 }
-                else -> {
+                PrinterConnectionType.SYSTEM_PRINT -> {
                     withContext(Dispatchers.Main) {
                         openSystemPrintDialog(context, "KOT-${kot.kotNumber}", textSlip)
-                        onComplete(true, "KOT sent to ${config.connectionType.displayName}")
+                        onComplete(true, "KOT sent to system printer")
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * Automatic smart print:
+     * 1. Direct USB POS printer (Rugtek, Epson, STMicro, etc.)
+     * 2. Linux device node (/dev/usb/lp0, /dev/ttyUSB0, etc.)
+     * 3. Paired Bluetooth printer (RP-80, POS-80, etc.)
+     * 4. LAN / Wi-Fi IP socket
+     * 5. Android system print dialog fallback
+     */
+    suspend fun autoDetectAndPrint(
+        context: Context,
+        data: ByteArray,
+        textSlip: String,
+        title: String,
+        onComplete: (Boolean, String) -> Unit
+    ) {
+        withContext(Dispatchers.IO) {
+            // 1. Try USB POS Printer
+            val usbPrinters = getConnectedUsbPrinters(context)
+            if (usbPrinters.isNotEmpty()) {
+                val usbRes = sendBytesToUsb(context, "", data)
+                if (usbRes.first) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Direct Bill Printed! (${usbRes.second})", Toast.LENGTH_SHORT).show()
+                        onComplete(true, usbRes.second)
+                    }
+                    return@withContext
+                }
+            }
+
+            // 2. Try direct POS Linux device nodes
+            val nodeRes = sendBytesToDeviceNode(data)
+            if (nodeRes.first) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Direct Bill Printed! (${nodeRes.second})", Toast.LENGTH_SHORT).show()
+                    onComplete(true, nodeRes.second)
+                }
+                return@withContext
+            }
+
+            // 3. Try Paired Bluetooth Printer
+            val btPrinters = getPairedBluetoothPrinters()
+            if (btPrinters.isNotEmpty()) {
+                val targetBt = btPrinters.first()
+                val btRes = sendBytesToBluetooth(context, targetBt.second, data)
+                if (btRes.first) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Direct Bill Printed! (${targetBt.first})", Toast.LENGTH_SHORT).show()
+                        onComplete(true, btRes.second)
+                    }
+                    return@withContext
+                }
+            }
+
+            // 4. Try Network Socket if custom IP configured
+            if (currentConfig.ipAddress.isNotBlank() && currentConfig.ipAddress != "192.168.1.100") {
+                val sockRes = sendBytesToSocket(currentConfig.ipAddress, currentConfig.port, data)
+                if (sockRes.first) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Direct Bill Printed! (${currentConfig.ipAddress})", Toast.LENGTH_SHORT).show()
+                        onComplete(true, sockRes.second)
+                    }
+                    return@withContext
+                }
+            }
+
+            // 5. Fallback: If no hardware printer detected, open system print dialog
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "No direct thermal printer found. Opening print dialog...", Toast.LENGTH_SHORT).show()
+                openSystemPrintDialog(context, title, textSlip)
+                onComplete(true, "Fallback print dialog opened")
             }
         }
     }
@@ -173,24 +339,372 @@ object PrinterManager {
         sb.appendLine("================================")
 
         withContext(Dispatchers.IO) {
-            if (config.connectionType == PrinterConnectionType.WIFI || config.connectionType == PrinterConnectionType.LAN) {
-                val bytes = generateTestSlipEscPos(config)
-                val res = sendBytesToSocket(config.ipAddress, config.port, bytes)
-                withContext(Dispatchers.Main) {
-                    if (res.first) {
-                        onComplete(true, "Test print sent successfully to ${config.ipAddress}")
-                    } else {
-                        // Open system print preview as fallback
-                        openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
-                        onComplete(true, "Sent to Android System Print dialog")
+            val bytes = generateTestSlipEscPos(config)
+            when (config.connectionType) {
+                PrinterConnectionType.AUTO_DETECT -> {
+                    autoDetectAndPrint(
+                        context = context,
+                        data = bytes,
+                        textSlip = sb.toString(),
+                        title = "Printer-Test-Slip",
+                        onComplete = onComplete
+                    )
+                }
+                PrinterConnectionType.USB -> {
+                    val res = sendBytesToUsb(context, config.usbDeviceName, bytes)
+                    withContext(Dispatchers.Main) {
+                        if (res.first) {
+                            onComplete(true, "USB Test Slip Printed (${res.second})")
+                        } else {
+                            openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
+                            onComplete(false, res.second)
+                        }
                     }
                 }
-            } else {
-                withContext(Dispatchers.Main) {
-                    openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
-                    onComplete(true, "Test page rendered to ${config.connectionType.displayName}")
+                PrinterConnectionType.BLUETOOTH -> {
+                    val res = sendBytesToBluetooth(
+                        context = context,
+                        deviceAddressOrName = config.bluetoothDeviceAddress.ifBlank { config.bluetoothDeviceName },
+                        data = bytes
+                    )
+                    withContext(Dispatchers.Main) {
+                        if (res.first) {
+                            onComplete(true, "Bluetooth Test Slip Printed (Auto-cut sent)")
+                        } else {
+                            openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
+                            onComplete(false, res.second)
+                        }
+                    }
+                }
+                PrinterConnectionType.WIFI, PrinterConnectionType.LAN -> {
+                    val res = sendBytesToSocket(config.ipAddress, config.port, bytes)
+                    withContext(Dispatchers.Main) {
+                        if (res.first) {
+                            onComplete(true, "Test print sent successfully to ${config.ipAddress}")
+                        } else {
+                            openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
+                            onComplete(false, res.second)
+                        }
+                    }
+                }
+                PrinterConnectionType.SYSTEM_PRINT -> {
+                    withContext(Dispatchers.Main) {
+                        openSystemPrintDialog(context, "Printer-Test-Page", sb.toString())
+                        onComplete(true, "Test page rendered to System Print Dialog")
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * Connects directly via USB Host (UsbManager) to send raw ESC/POS bytes.
+     * Fully compatible with Rugtek RP-326, RP-80, RP-330, and other POS USB thermal printers.
+     */
+    fun sendBytesToUsb(
+        context: Context,
+        deviceAddressOrName: String = "",
+        data: ByteArray
+    ): Pair<Boolean, String> {
+        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
+            ?: return Pair(false, "USB Service unavailable on device")
+
+        val deviceList = usbManager.deviceList
+        if (deviceList.isEmpty()) {
+            val nodeRes = sendBytesToDeviceNode(data)
+            if (nodeRes.first) return nodeRes
+            return Pair(false, "No USB printer detected on terminal")
+        }
+
+        // Find printer device
+        var targetDevice: UsbDevice? = null
+        if (deviceAddressOrName.isNotBlank()) {
+            targetDevice = deviceList.values.find { dev ->
+                dev.deviceName.contains(deviceAddressOrName, ignoreCase = true) ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && dev.productName?.contains(deviceAddressOrName, ignoreCase = true) == true)
+            }
+        }
+
+        if (targetDevice == null) {
+            targetDevice = deviceList.values.find { isUsbDevicePrinter(it) } ?: deviceList.values.firstOrNull()
+        }
+
+        if (targetDevice == null) {
+            val nodeRes = sendBytesToDeviceNode(data)
+            if (nodeRes.first) return nodeRes
+            return Pair(false, "No compatible USB POS printer found")
+        }
+
+        // Check permission
+        if (!usbManager.hasPermission(targetDevice)) {
+            try {
+                requestUsbPermission(context, usbManager, targetDevice)
+            } catch (_: Exception) {}
+            // Also test writing to device node
+            val nodeRes = sendBytesToDeviceNode(data)
+            if (nodeRes.first) return nodeRes
+            return Pair(false, "USB Permission requested. Please accept prompt on screen.")
+        }
+
+        var connection: UsbDeviceConnection? = null
+        var claimedIface: UsbInterface? = null
+        return try {
+            connection = usbManager.openDevice(targetDevice)
+                ?: run {
+                    val nodeRes = sendBytesToDeviceNode(data)
+                    if (nodeRes.first) return nodeRes
+                    return Pair(false, "Failed to open USB connection to ${targetDevice.deviceName}")
+                }
+
+            // Find bulk OUT endpoint
+            var outEndpoint: UsbEndpoint? = null
+            for (i in 0 until targetDevice.interfaceCount) {
+                val iface = targetDevice.getInterface(i)
+                for (j in 0 until iface.endpointCount) {
+                    val ep = iface.getEndpoint(j)
+                    if (ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK && ep.direction == UsbConstants.USB_DIR_OUT) {
+                        outEndpoint = ep
+                        claimedIface = iface
+                        break
+                    }
+                }
+                if (outEndpoint != null) break
+            }
+
+            if (claimedIface == null || outEndpoint == null) {
+                connection.close()
+                val nodeRes = sendBytesToDeviceNode(data)
+                if (nodeRes.first) return nodeRes
+                return Pair(false, "No Bulk OUT endpoint found on USB printer")
+            }
+
+            connection.claimInterface(claimedIface, true)
+
+            val chunkSize = 4096
+            var offset = 0
+            var totalWritten = 0
+            while (offset < data.size) {
+                val length = minOf(chunkSize, data.size - offset)
+                val chunk = data.copyOfRange(offset, offset + length)
+                val written = connection.bulkTransfer(outEndpoint, chunk, length, 5000)
+                if (written < 0) break
+                totalWritten += written
+                offset += length
+            }
+
+            val devTitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                targetDevice.productName?.ifBlank { null } ?: targetDevice.deviceName
+            } else {
+                targetDevice.deviceName
+            }
+
+            Pair(true, "Printed via $devTitle (Auto-Cut sent)")
+        } catch (e: Exception) {
+            val nodeRes = sendBytesToDeviceNode(data)
+            if (nodeRes.first) return nodeRes
+            Pair(false, "USB Print Error: ${e.localizedMessage}")
+        } finally {
+            try {
+                claimedIface?.let { connection?.releaseInterface(it) }
+                connection?.close()
+            } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * Direct POS hardware character device node (/dev/usb/lp0, /dev/ttyUSB0, etc.)
+     */
+    fun sendBytesToDeviceNode(data: ByteArray): Pair<Boolean, String> {
+        val candidateNodes = listOf(
+            "/dev/usb/lp0",
+            "/dev/usb/lp1",
+            "/dev/ttyUSB0",
+            "/dev/ttyACM0",
+            "/dev/ttyS1",
+            "/dev/ttyS3",
+            "/dev/ttyS4"
+        )
+        for (path in candidateNodes) {
+            val f = File(path)
+            if (f.exists()) {
+                try {
+                    FileOutputStream(f).use { fos ->
+                        fos.write(data)
+                        fos.flush()
+                    }
+                    return Pair(true, "Printed to POS device node ($path)")
+                } catch (_: Exception) {}
+            }
+        }
+        return Pair(false, "No accessible POS device node")
+    }
+
+    fun getAvailableDeviceNode(): String? {
+        val candidateNodes = listOf(
+            "/dev/usb/lp0",
+            "/dev/usb/lp1",
+            "/dev/ttyUSB0",
+            "/dev/ttyACM0",
+            "/dev/ttyS1",
+            "/dev/ttyS3",
+            "/dev/ttyS4"
+        )
+        for (path in candidateNodes) {
+            val f = File(path)
+            if (f.exists() && f.canWrite()) return path
+        }
+        return null
+    }
+
+    /**
+     * Request permission for USB device
+     */
+    fun requestUsbPermission(context: Context, usbManager: UsbManager, device: UsbDevice) {
+        val permissionIntent = PendingIntent.getBroadcast(
+            context,
+            0,
+            Intent("com.example.USB_PERMISSION"),
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_IMMUTABLE
+            } else {
+                0
+            }
+        )
+        usbManager.requestPermission(device, permissionIntent)
+    }
+
+    /**
+     * Check if a USB device matches printer profile
+     */
+    fun isUsbDevicePrinter(device: UsbDevice): Boolean {
+        for (i in 0 until device.interfaceCount) {
+            val iface = device.getInterface(i)
+            if (iface.interfaceClass == UsbConstants.USB_CLASS_PRINTER) return true
+            if (iface.interfaceClass == 255 || iface.interfaceClass == 0) {
+                for (j in 0 until iface.endpointCount) {
+                    val ep = iface.getEndpoint(j)
+                    if (ep.type == UsbConstants.USB_ENDPOINT_XFER_BULK && ep.direction == UsbConstants.USB_DIR_OUT) {
+                        return true
+                    }
+                }
+            }
+        }
+        val knownPosVendorIds = setOf(
+            0x0416, 0x0483, 0x0493, 0x04b8, 0x0525, 0x0fe6, 0x1504, 0x154f, 0x1659, 0x1a86, 0x1fc9, 0x20d1, 0x28e9, 0x6868
+        )
+        if (knownPosVendorIds.contains(device.vendorId)) return true
+
+        val name = (device.deviceName + " " + (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) device.productName ?: "" else "")).lowercase()
+        return name.contains("print") || name.contains("pos") || name.contains("rugtek") || name.contains("thermal") || name.contains("receipt")
+    }
+
+    /**
+     * Scans and returns connected USB printers
+     */
+    fun getConnectedUsbPrinters(context: Context): List<UsbPrinterInfo> {
+        val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager ?: return emptyList()
+        val list = mutableListOf<UsbPrinterInfo>()
+        for (device in usbManager.deviceList.values) {
+            val hasPerm = usbManager.hasPermission(device)
+            val devName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                device.productName?.ifBlank { null } ?: device.deviceName
+            } else {
+                device.deviceName
+            }
+            val manufacturer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                device.manufacturerName ?: "POS Hardware"
+            } else {
+                "POS Hardware"
+            }
+            if (isUsbDevicePrinter(device) || usbManager.deviceList.size == 1) {
+                list.add(UsbPrinterInfo(devName, manufacturer, device.vendorId, device.productId, hasPerm, device))
+            }
+        }
+        return list
+    }
+
+    /**
+     * Returns human-readable summary of detected printer hardware
+     */
+    fun getDetectedPrinterSummary(context: Context): String {
+        val usbPrinters = getConnectedUsbPrinters(context)
+        if (usbPrinters.isNotEmpty()) {
+            return "Rugtek / USB: ${usbPrinters.first().name}"
+        }
+        val node = getAvailableDeviceNode()
+        if (node != null) {
+            return "POS Hardware ($node)"
+        }
+        val btPrinters = getPairedBluetoothPrinters()
+        if (btPrinters.isNotEmpty()) {
+            return "Bluetooth: ${btPrinters.first().first}"
+        }
+        if (currentConfig.connectionType == PrinterConnectionType.WIFI || currentConfig.connectionType == PrinterConnectionType.LAN) {
+            return "${currentConfig.connectionType.displayName} (${currentConfig.ipAddress})"
+        }
+        return "Auto-Detect (Rugtek / USB / Bluetooth)"
+    }
+
+    /**
+     * Connects via Bluetooth RFCOMM SPP Socket to paired Bluetooth 58mm/80mm thermal POS printer.
+     */
+    suspend fun sendBytesToBluetooth(
+        context: Context,
+        deviceAddressOrName: String,
+        data: ByteArray
+    ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                ?: return@withContext Pair(false, "Bluetooth hardware not detected on device")
+
+            if (!bluetoothAdapter.isEnabled) {
+                return@withContext Pair(false, "Bluetooth is turned off. Please turn on Bluetooth.")
+            }
+
+            val bondedDevices = try {
+                bluetoothAdapter.bondedDevices ?: emptySet()
+            } catch (e: SecurityException) {
+                return@withContext Pair(false, "Bluetooth permission required: ${e.message}")
+            }
+
+            val targetDevice = if (deviceAddressOrName.isNotBlank()) {
+                bondedDevices.find {
+                    it.address.equals(deviceAddressOrName, ignoreCase = true) ||
+                    (it.name != null && it.name.equals(deviceAddressOrName, ignoreCase = true))
+                } ?: bondedDevices.firstOrNull()
+            } else {
+                bondedDevices.firstOrNull()
+            }
+
+            if (targetDevice == null) {
+                return@withContext Pair(false, "No paired Bluetooth printer found. Please pair printer first.")
+            }
+
+            try { bluetoothAdapter.cancelDiscovery() } catch (_: Exception) {}
+
+            val sppUuid = java.util.UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+            val socket = targetDevice.createRfcommSocketToServiceRecord(sppUuid)
+            socket.connect()
+            socket.outputStream.use { outStream ->
+                outStream.write(data)
+                outStream.flush()
+            }
+            socket.close()
+            Pair(true, "Sent to ${targetDevice.name ?: targetDevice.address}")
+        } catch (e: Exception) {
+            Pair(false, e.localizedMessage ?: "Bluetooth printer connection failed")
+        }
+    }
+
+    /**
+     * Returns list of currently paired/bonded Bluetooth devices (Name to MAC address)
+     */
+    fun getPairedBluetoothPrinters(): List<Pair<String, String>> {
+        return try {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return emptyList()
+            adapter.bondedDevices.map { (it.name ?: "Bluetooth Printer") to it.address }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -246,7 +760,6 @@ object PrinterManager {
                     try {
                         destination?.fileDescriptor?.let { fd ->
                             FileOutputStream(fd).use { fos ->
-                                // Render formatted receipt page as PDF
                                 val pdfDoc = android.graphics.pdf.PdfDocument()
                                 val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(300, 700, 1).create()
                                 val page = pdfDoc.startPage(pageInfo)
@@ -365,7 +878,9 @@ object PrinterManager {
         out.write(LF.toInt())
 
         // Cut Paper & Kick Drawer
-        out.write(CMD_CUT_PAPER)
+        if (config.autoCutPaper) {
+            out.write(CMD_CUT_PAPER)
+        }
         out.write(CMD_DRAWER_KICK)
 
         return out.toByteArray()
@@ -412,7 +927,9 @@ object PrinterManager {
 
         out.write(LF.toInt())
         out.write(LF.toInt())
-        out.write(CMD_CUT_PAPER)
+        if (config.autoCutPaper) {
+            out.write(CMD_CUT_PAPER)
+        }
 
         return out.toByteArray()
     }
@@ -426,13 +943,15 @@ object PrinterManager {
         out.write(CMD_ALIGN_CENTER)
         out.write(CMD_BOLD_ON)
         out.write("70MM LOUNGE POS\n".toByteArray())
-        out.write("TEST PRINT SUCCESSFUL\n".toByteArray())
+        out.write("PRINTER TEST SUCCESSFUL\n".toByteArray())
         out.write(CMD_BOLD_OFF)
-        out.write("Printer: ${config.connectionType.displayName}\n".toByteArray())
+        out.write("Mode: ${config.connectionType.displayName}\n".toByteArray())
         out.write("Paper Width: ${config.paperWidth.label}\n".toByteArray())
         out.write(SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(Date()).toByteArray())
         out.write("\n\n\n".toByteArray())
-        out.write(CMD_CUT_PAPER)
+        if (config.autoCutPaper) {
+            out.write(CMD_CUT_PAPER)
+        }
         return out.toByteArray()
     }
 

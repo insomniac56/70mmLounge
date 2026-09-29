@@ -88,12 +88,12 @@ fun OrdersHistoryScreen(
             text = "Invoices & Receipts",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = Slate900
+            color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = "${ordersWithItems.size} total completed transactions",
             style = MaterialTheme.typography.bodySmall,
-            color = Slate500
+            color = Slate400
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -117,8 +117,10 @@ fun OrdersHistoryScreen(
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Slate900,
-                unfocusedBorderColor = Slate200,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                focusedBorderColor = Emerald600,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surface
             )
@@ -188,18 +190,18 @@ private fun OrderHistoryCard(
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = Slate900
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
                         modifier = Modifier.clip(RoundedCornerShape(4.dp)),
-                        color = Slate100
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
                             text = order.paymentMethod,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = Slate700,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -224,12 +226,12 @@ private fun OrderHistoryCard(
                 Text(
                     text = order.customerName + if (order.customerPhone.isNotBlank()) " (${order.customerPhone})" else "",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate700
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = CurrencyFormatter.formatDateTime(order.timestamp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = Slate500
+                    color = Slate400
                 )
             }
 
@@ -240,7 +242,7 @@ private fun OrderHistoryCard(
             Text(
                 text = itemsSnippet,
                 style = MaterialTheme.typography.bodySmall,
-                color = Slate500,
+                color = Slate400,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

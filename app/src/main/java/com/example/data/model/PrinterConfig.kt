@@ -1,11 +1,12 @@
 package com.example.data.model
 
 enum class PrinterConnectionType(val displayName: String, val defaultPort: Int = 9100) {
-    THERMAL_ESC_POS("Thermal (ESC/POS)"),
+    AUTO_DETECT("Auto-Detect (USB / Rugtek / Bluetooth)"),
+    USB("USB Direct POS (Rugtek / Thermal)"),
     BLUETOOTH("Bluetooth Thermal"),
     WIFI("Wi-Fi Network Printer"),
-    USB("USB Direct POS"),
-    LAN("LAN / Ethernet Printer")
+    LAN("LAN / Ethernet Printer"),
+    SYSTEM_PRINT("Android System Print Dialog")
 }
 
 enum class ThermalPaperWidth(val label: String, val lineChars: Int) {
@@ -14,15 +15,19 @@ enum class ThermalPaperWidth(val label: String, val lineChars: Int) {
 }
 
 data class PrinterConfig(
-    val connectionType: PrinterConnectionType = PrinterConnectionType.THERMAL_ESC_POS,
+    val connectionType: PrinterConnectionType = PrinterConnectionType.AUTO_DETECT,
     val paperWidth: ThermalPaperWidth = ThermalPaperWidth.WIDTH_80MM,
     val ipAddress: String = "192.168.1.100",
     val port: Int = 9100,
     val bluetoothDeviceAddress: String = "",
     val bluetoothDeviceName: String = "POS-Printer-80",
-    val usbDeviceName: String = "POS USB Receipt Printer",
+    val usbDeviceName: String = "Rugtek POS Thermal Printer",
     val autoPrintBillOnCheckout: Boolean = true,
     val autoPrintKotOnOrder: Boolean = true,
     val isConnected: Boolean = true,
-    val printCopies: Int = 1
+    val autoCutPaper: Boolean = true,
+    val printCopies: Int = 1,
+    val usbVendorId: Int = 0,
+    val usbProductId: Int = 0,
+    val lastDiscoveredSummary: String = ""
 )

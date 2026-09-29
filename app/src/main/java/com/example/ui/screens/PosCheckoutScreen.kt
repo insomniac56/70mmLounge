@@ -1434,7 +1434,8 @@ private fun CartCheckoutSheetContent(
         HorizontalDivider(color = Slate200)
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Customer Details Accordion
+        // Customer Details Accordion (always visible if name or phone or table is set)
+        val hasCustomerInfo = customerName.isNotBlank() || customerPhone.isNotBlank() || selectedTableNumber.isNotBlank()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1444,20 +1445,20 @@ private fun CartCheckoutSheetContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Customer Details (Optional)",
+                text = "Customer Details & Invoice Info",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = Slate800
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = if (showCustomerInputs) "Hide" else "Add",
+                text = if (showCustomerInputs || hasCustomerInfo) "Edit" else "Add",
                 style = MaterialTheme.typography.labelMedium,
-                color = Sky600,
+                color = Emerald600,
                 fontWeight = FontWeight.Bold
             )
         }
 
-        if (showCustomerInputs) {
+        if (showCustomerInputs || hasCustomerInfo) {
             Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1470,17 +1471,33 @@ private fun CartCheckoutSheetContent(
                     label = { Text("Customer Name") },
                     placeholder = { Text("Walk-in") },
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = Emerald600,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
                 OutlinedTextField(
                     value = customerPhone,
                     onValueChange = { viewModel.setCustomerDetails(customerName, it) },
                     modifier = Modifier.weight(1f).testTag("customer_phone_input"),
-                    label = { Text("Phone") },
+                    label = { Text("Phone (Mobile)") },
                     placeholder = { Text("555-0100") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = Emerald600,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
             }
         }
@@ -1738,7 +1755,16 @@ private fun CartCheckoutSheetContent(
                         viewModel.setCashTendered(amount)
                     },
                     modifier = Modifier.fillMaxWidth().testTag("cash_tendered_input"),
-                    label = { Text("Tendered Cash Amount (₹)") },
+                    label = { Text("Tendered Cash Amount (₹)", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    placeholder = { Text("Enter cash amount", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedBorderColor = Emerald600,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     shape = RoundedCornerShape(8.dp)
@@ -2642,52 +2668,36 @@ private fun NewOrderDialog(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        IconButton(
+                            onClick = { if (guestCount > 1) guestCount-- },
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            IconButton(onClick = { if (guestCount > 1) guestCount-- }) {
-                                Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = Slate700)
-                            }
-                            Text(
-                                text = "$guestCount",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp)
-                            )
-                            IconButton(onClick = { guestCount++ }) {
-                                Icon(Icons.Default.Add, contentDescription = "Increase", tint = Slate700)
-                            }
+                            Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = MaterialTheme.colorScheme.onSurface)
                         }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for (p in listOf(1, 2, 4, 6, 8)) {
-                                Surface(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .clickable { guestCount = p },
-                                    color = if (guestCount == p) Emerald600 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    contentColor = if (guestCount == p) Color.White else MaterialTheme.colorScheme.onSurface
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text("$p", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    }
-                                }
-                            }
+                        Text(
+                            text = "$guestCount",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 14.dp)
+                        )
+                        IconButton(
+                            onClick = { guestCount++ },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Increase", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Customer Details Section
                 Text(
@@ -2696,26 +2706,26 @@ private fun NewOrderDialog(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 OutlinedTextField(
                     value = customerName,
                     onValueChange = { customerName = it },
-                    label = { Text("Customer / Guest Name") },
-                    placeholder = { Text("e.g. Rohan Sharma") },
+                    label = { Text("Customer / Guest Name", maxLines = 1) },
+                    placeholder = { Text("e.g. Rohan Sharma", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = Slate500) },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 OutlinedTextField(
                     value = customerPhone,
                     onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) customerPhone = it },
-                    label = { Text("Mobile Number (Optional)") },
-                    placeholder = { Text("10-digit number for invoice") },
+                    label = { Text("Mobile Number (Optional)", maxLines = 1) },
+                    placeholder = { Text("10-digit number for invoice", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Slate500) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true,
@@ -2723,33 +2733,33 @@ private fun NewOrderDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 OutlinedTextField(
                     value = serverName,
                     onValueChange = { serverName = it },
-                    label = { Text("Captain / Server") },
-                    placeholder = { Text("e.g. Captain 1") },
+                    label = { Text("Captain / Server", maxLines = 1) },
+                    placeholder = { Text("e.g. Captain 1", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Badge, contentDescription = null, tint = Slate500) },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 OutlinedTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Special Requests / Notes") },
-                    placeholder = { Text("e.g. Less spicy, extra sauce") },
+                    label = { Text("Special Requests / Notes", maxLines = 1) },
+                    placeholder = { Text("e.g. Less spicy, extra sauce", maxLines = 1) },
                     leadingIcon = { Icon(Icons.Default.Notes, contentDescription = null, tint = Slate500) },
                     singleLine = true,
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Bottom Buttons
                 Row(

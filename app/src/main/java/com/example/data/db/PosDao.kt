@@ -157,6 +157,15 @@ interface PosDao {
     @Query("DELETE FROM restaurant_tables")
     suspend fun deleteAllTables()
 
+    @Query("DELETE FROM kitchen_order_tickets")
+    suspend fun deleteAllKots()
+
+    @Query("DELETE FROM sale_orders")
+    suspend fun deleteAllOrders()
+
+    @Query("DELETE FROM sale_order_items")
+    suspend fun deleteAllOrderItems()
+
     @Query("SELECT COUNT(*) FROM sale_orders")
     suspend fun getOrderCount(): Int
 }

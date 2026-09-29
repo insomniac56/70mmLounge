@@ -105,6 +105,10 @@ class PosRepository(private val dao: PosDao) {
         return dao.getKotCount()
     }
 
+    suspend fun getOrderCount(): Int {
+        return dao.getOrderCount()
+    }
+
     /**
      * Submits an order placed by customer at a Table via QR Code:
      * 1. Creates KOT for the Kitchen / Bar

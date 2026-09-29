@@ -202,22 +202,6 @@ fun TablesScreen(
                             )
                         }
                     }
-
-                    // Add Table Button
-                    Surface(
-                        onClick = { showAddTableDialog = true },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .border(1.dp, Slate700, RoundedCornerShape(10.dp))
-                            .testTag("add_table_top_button"),
-                        color = Slate900,
-                        contentColor = Emerald600
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Table", modifier = Modifier.size(20.dp))
-                        }
-                    }
                 }
             }
 

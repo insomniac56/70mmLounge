@@ -329,7 +329,7 @@ fun ReceiptDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "TOTAL PAYABLE",
+                                text = "TOTAL AMOUNT",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Black,
                                 color = Slate900
@@ -364,7 +364,55 @@ fun ReceiptDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Auto-detected printer status card
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showPrinterSettings = true },
+                    color = Emerald50,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Emerald600.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(Emerald600)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = PrinterManager.getDetectedPrinterSummary(context),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate900
+                                )
+                                Text(
+                                    text = "Direct 1-Click Thermal Print with Auto-Cut",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp,
+                                    color = Emerald600
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Settings ⚙️",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Slate600,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Actions: Print Bill, Share, Done
                 Row(
@@ -378,25 +426,30 @@ fun ReceiptDialog(
                             }
                         },
                         modifier = Modifier
-                            .weight(1.3f)
+                            .weight(1.4f)
                             .testTag("print_receipt_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                        colors = ButtonDefaults.buttonColors(containerColor = Emerald600, contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Print,
                             contentDescription = "Print Receipt",
+                            tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Print Bill")
+                        Text("Print Bill", color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
-                    OutlinedButton(
+                    Button(
                         onClick = { shareReceiptAsText(context, orderWithItems) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("share_receipt_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
@@ -405,7 +458,7 @@ fun ReceiptDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Share")
+                        Text("Share", fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -413,26 +466,12 @@ fun ReceiptDialog(
                         modifier = Modifier
                             .weight(0.9f)
                             .testTag("dismiss_receipt_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Slate900),
+                        colors = ButtonDefaults.buttonColors(containerColor = Slate900, contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Done")
+                        Text("Done", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Small Printer settings button
-                Text(
-                    text = "⚙️ Printer: ${PrinterManager.currentConfig.connectionType.displayName} (${PrinterManager.currentConfig.paperWidth.label})",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Slate500,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { showPrinterSettings = true }
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                )
             }
         }
     }

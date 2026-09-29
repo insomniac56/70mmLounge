@@ -9,6 +9,7 @@ import com.example.data.model.CartItem
 import com.example.data.model.CategorySaleStat
 import com.example.data.model.GstSlabSummary
 import com.example.data.model.KitchenOrderTicket
+import com.example.data.model.KotAlertEvent
 import com.example.data.model.OrderWithItems
 import com.example.data.model.PaymentMethodBreakdown
 import com.example.data.model.ProductItem
@@ -21,9 +22,12 @@ import com.example.data.model.TopSellingProduct
 import com.example.data.repository.PosRepository
 import com.example.util.TableUrlGenerator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
@@ -182,8 +186,30 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
     private val _isKitchenAudioEnabled = MutableStateFlow(true)
     val isKitchenAudioEnabled: StateFlow<Boolean> = _isKitchenAudioEnabled.asStateFlow()
 
+    private val _isKotVoiceEnabled = MutableStateFlow(true)
+    val isKotVoiceEnabled: StateFlow<Boolean> = _isKotVoiceEnabled.asStateFlow()
+
+    private val _kotAlertFlow = MutableSharedFlow<KotAlertEvent>(extraBufferCapacity = 10)
+    val kotAlertFlow: SharedFlow<KotAlertEvent> = _kotAlertFlow.asSharedFlow()
+
     fun toggleKitchenAudio() {
         _isKitchenAudioEnabled.value = !_isKitchenAudioEnabled.value
+    }
+
+    fun toggleKotVoice() {
+        _isKotVoiceEnabled.value = !_isKotVoiceEnabled.value
+    }
+
+    fun triggerTestKotVoice(isAddon: Boolean) {
+        viewModelScope.launch {
+            _kotAlertFlow.emit(
+                KotAlertEvent(
+                    areaName = if (isAddon) "Lounge" else "Main Dining",
+                    tableNumber = if (isAddon) "Table 3" else "Table 5",
+                    isAddon = isAddon
+                )
+            )
+        }
     }
 
     fun updateKotStatus(kotId: Long, newStatus: String) {
@@ -518,6 +544,7 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         val notes = _customerSpecialNotes.value
 
         viewModelScope.launch(Dispatchers.IO) {
+            val isAddon = table.isOccupied || table.currentBillAmount > 0
             repository.submitCustomerTableOrder(
                 tableNumber = table.tableNumber,
                 zone = table.zone,
@@ -525,6 +552,13 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 customerPhone = guestPhone,
                 cartItems = items,
                 specialNotes = notes
+            )
+            _kotAlertFlow.emit(
+                KotAlertEvent(
+                    areaName = table.zone,
+                    tableNumber = table.tableNumber,
+                    isAddon = isAddon
+                )
             )
             _customerOrderPlacedSuccess.value = true
             _customerCartItems.value = emptyList()
@@ -700,6 +734,8 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 } ?: emptyList()
             } else emptyList()
 
+            val isAddon = activeKotsForTable.isNotEmpty() || (table != null && (table.isOccupied || table.currentBillAmount > 0))
+
             if (activeKotsForTable.isNotEmpty()) {
                 val latest = activeKotsForTable.first()
                 val updatedKot = latest.copy(
@@ -738,6 +774,14 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             saveCurrentTableDraft()
+
+            _kotAlertFlow.emit(
+                KotAlertEvent(
+                    areaName = zone,
+                    tableNumber = tableNum.ifBlank { "Takeaway" },
+                    isAddon = isAddon
+                )
+            )
 
             launch(Dispatchers.Main) {
                 onSuccess?.invoke()
@@ -867,37 +911,40 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val netProfit = (grandTotal - totalTax - totalCost).coerceAtLeast(0.0)
-        val invoiceNo = "INV-${Calendar.getInstance().get(Calendar.YEAR)}-${(1000 + (System.currentTimeMillis() % 9000))}"
         val tableNum = _selectedTableNumber.value
         val orderTypeVal = _selectedOrderType.value
 
-        val order = SaleOrder(
-            invoiceNumber = invoiceNo,
-            timestamp = System.currentTimeMillis(),
-            customerName = _customerName.value.ifBlank { if (tableNum.isNotBlank()) "Table $tableNum" else "Walk-in Customer" },
-            customerPhone = _customerPhone.value,
-            paymentMethod = _paymentMethod.value,
-            subtotal = subtotal,
-            discountPercent = billDiscPercent,
-            discountAmount = totalDiscount,
-            taxAmount = totalTax,
-            totalAmount = grandTotal,
-            totalCost = totalCost,
-            netProfit = netProfit,
-            tableNumber = tableNum,
-            orderType = orderTypeVal,
-            notes = buildString {
-                if (_paymentMethod.value == "CASH" && _cashTendered.value > 0) {
-                    val change = (_cashTendered.value - grandTotal).coerceAtLeast(0.0)
-                    append("Cash tendered ₹${String.format("%.2f", _cashTendered.value)}, Change ₹${String.format("%.2f", change)}. ")
-                }
-                if (_serverName.value.isNotBlank()) append("Server: ${_serverName.value}. ")
-                if (_guestCount.value > 0 && orderTypeVal == "Dine-in") append("Pax: ${_guestCount.value}. ")
-                if (_orderNotes.value.isNotBlank()) append("Notes: ${_orderNotes.value}")
-            }.trim()
-        )
-
         viewModelScope.launch(Dispatchers.IO) {
+            val totalExistingOrders = repository.getOrderCount()
+            val serialNumber = totalExistingOrders + 1
+            val invoiceNo = if (serialNumber < 10) String.format("%02d", serialNumber) else serialNumber.toString()
+
+            val order = SaleOrder(
+                invoiceNumber = invoiceNo,
+                timestamp = System.currentTimeMillis(),
+                customerName = _customerName.value.ifBlank { if (tableNum.isNotBlank()) "Table $tableNum" else "Walk-in Customer" },
+                customerPhone = _customerPhone.value,
+                paymentMethod = _paymentMethod.value,
+                subtotal = subtotal,
+                discountPercent = billDiscPercent,
+                discountAmount = totalDiscount,
+                taxAmount = totalTax,
+                totalAmount = grandTotal,
+                totalCost = totalCost,
+                netProfit = netProfit,
+                tableNumber = tableNum,
+                orderType = orderTypeVal,
+                notes = buildString {
+                    if (_paymentMethod.value == "CASH" && _cashTendered.value > 0) {
+                        val change = (_cashTendered.value - grandTotal).coerceAtLeast(0.0)
+                        append("Cash tendered ₹${String.format("%.2f", _cashTendered.value)}, Change ₹${String.format("%.2f", change)}. ")
+                    }
+                    if (_serverName.value.isNotBlank()) append("Server: ${_serverName.value}. ")
+                    if (_guestCount.value > 0 && orderTypeVal == "Dine-in") append("Pax: ${_guestCount.value}. ")
+                    if (_orderNotes.value.isNotBlank()) append("Notes: ${_orderNotes.value}")
+                }.trim()
+            )
+
             val orderId = repository.completeSale(order, orderItems, items)
             if (tableNum.isNotBlank()) {
                 _tableDrafts.remove(tableNum)
