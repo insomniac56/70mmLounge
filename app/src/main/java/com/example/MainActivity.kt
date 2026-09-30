@@ -32,6 +32,11 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Print
@@ -40,23 +45,30 @@ import androidx.compose.material.icons.filled.SoupKitchen
 import androidx.compose.material.icons.filled.TableBar
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -71,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.RestaurantTable
+import com.example.ui.components.CloudSyncDialog
 import com.example.ui.components.PcSoftwareDialog
 import com.example.ui.components.PrinterSettingsDialog
 import com.example.ui.components.ReceiptDialog
@@ -116,6 +129,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleIncomingIntent(intent)
         CustomerHttpServer.start(this, viewModel.repository)
+        com.example.util.CloudOrderRelay.start(this, viewModel.repository)
         com.example.util.PrinterManager.init(this)
         com.example.util.PrinterDiscoveryManager.startService(this)
         setContent {
@@ -150,6 +164,10 @@ fun MainAppScaffold(viewModel: PosViewModel) {
     var isInventoryOpen by remember { mutableStateOf(false) }
     var showPcDialog by remember { mutableStateOf(false) }
     var showPrinterDialog by remember { mutableStateOf(false) }
+    var showCloudSyncDialog by remember { mutableStateOf(false) }
+
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
 
     val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val cartItems by viewModel.cartItems.collectAsStateWithLifecycle()
@@ -159,6 +177,7 @@ fun MainAppScaffold(viewModel: PosViewModel) {
     val activeCustomerTable by viewModel.activeCustomerTable.collectAsStateWithLifecycle()
     val lowStockProducts by viewModel.lowStockProducts.collectAsStateWithLifecycle()
     val lowStockRawIngredients by viewModel.lowStockRawIngredients.collectAsStateWithLifecycle()
+    val salesSummary by viewModel.currentSalesSummary.collectAsStateWithLifecycle()
 
     val cartCount = cartItems.sumOf { it.quantity }
     val prepKotsCount = activeKots.count { it.status == "NEW" || it.status == "PREPARING" }
@@ -179,138 +198,259 @@ fun MainAppScaffold(viewModel: PosViewModel) {
         return
     }
 
-    // BackHandler to return to POS checkout if on secondary tab or inventory
-    BackHandler(enabled = isInventoryOpen || currentScreen != PosNavDestination.POS) {
-        if (isInventoryOpen) {
+    // BackHandler to handle drawer or return to POS checkout if on secondary tab or inventory
+    BackHandler(enabled = drawerState.isOpen || isInventoryOpen || currentScreen != PosNavDestination.POS) {
+        if (drawerState.isOpen) {
+            coroutineScope.launch { drawerState.close() }
+        } else if (isInventoryOpen) {
             isInventoryOpen = false
         } else {
             currentScreen = PosNavDestination.POS
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets.safeDrawing,
-        topBar = {
-            TopAppBar(
-                title = {
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.widthIn(max = 330.dp)
+            ) {
+                // Drawer Header
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Slate900)
+                        .padding(20.dp)
+                ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.logo_70mm),
                             contentDescription = "70mm Lounge Logo",
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(50.dp)
                                 .clip(CircleShape)
-                                .border(1.dp, Emerald600, CircleShape),
+                                .border(1.5.dp, Emerald600, CircleShape),
                             contentScale = ContentScale.Fit
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = "70mm Lounge",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.5.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                        IconButton(
+                            onClick = { coroutineScope.launch { drawerState.close() } }
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close Slider", tint = Slate400)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "70mm Lounge",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Restaurant & Club • Bokaro Steel City",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Slate400
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        color = Emerald600.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(Emerald600)
                             )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Restaurant & Club • Bokaro",
+                                text = "Multi-Terminal Active • Live Sync",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Slate500,
-                                fontSize = 10.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = Emerald600,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
-                },
-                actions = {
-                    // Low-Stock Notification Bell Alert
-                    if (lowStockCount > 0) {
-                        IconButton(
-                            onClick = {
-                                isInventoryOpen = true
-                                viewModel.openLowStockAlertSheet()
-                            },
-                            modifier = Modifier.testTag("low_stock_notification_button")
-                        ) {
-                            BadgedBox(
-                                badge = {
-                                    Badge(
-                                        containerColor = if (lowStockRawIngredients.isNotEmpty()) Color(0xFFEF4444) else Color(0xFFF59E0B),
-                                        contentColor = Color.White
-                                    ) {
-                                        Text("$lowStockCount")
-                                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // List-wise Menu Items (The 3 icons from top bar + Cloud Real-time live monitor)
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Print, contentDescription = null, tint = Emerald600) },
+                    label = {
+                        Column {
+                            Text("Printer Settings", fontWeight = FontWeight.Bold)
+                            Text("Thermal 58/80mm, Bluetooth, USB, LAN", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        showPrinterDialog = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.DesktopWindows, contentDescription = null, tint = Sky600) },
+                    label = {
+                        Column {
+                            Text("Install on PC / Windows", fontWeight = FontWeight.Bold)
+                            Text("Desktop POS App & LAN multi-terminal", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        showPcDialog = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Inventory2, contentDescription = null, tint = Amber500) },
+                    label = {
+                        Column {
+                            Text("Inventory & Menu Management", fontWeight = FontWeight.Bold)
+                            Text("Dishes, stock levels & ingredient alerts", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                        }
+                    },
+                    selected = isInventoryOpen,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        isInventoryOpen = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.CloudSync, contentDescription = null, tint = Sky600) },
+                    label = {
+                        Column {
+                            Text("Cloud Real-Time Sync & Live Sales", fontWeight = FontWeight.Bold)
+                            Text("Travel anywhere and monitor live sales on mobile", style = MaterialTheme.typography.labelSmall, color = Slate500)
+                        }
+                    },
+                    selected = false,
+                    onClick = {
+                        coroutineScope.launch { drawerState.close() }
+                        showCloudSyncDialog = true
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+    ) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            contentWindowInsets = WindowInsets.safeDrawing,
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    coroutineScope.launch { drawerState.open() }
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.NotificationsActive,
-                                    contentDescription = "Low Stock Alerts",
-                                    tint = if (lowStockRawIngredients.isNotEmpty()) Color(0xFFEF4444) else Color(0xFFF59E0B)
+                                .padding(end = 4.dp)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.logo_70mm),
+                                contentDescription = "70mm Lounge Logo",
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .border(1.dp, Emerald600, CircleShape),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = "70mm Lounge",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(
+                                        Icons.Default.Menu,
+                                        contentDescription = "Open Sidebar Slider",
+                                        tint = Slate500,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Text(
+                                    text = "Restaurant & Club • Bokaro",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Slate500,
+                                    fontSize = 10.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
-                    }
+                    },
+                    actions = {
+                        // Low-Stock Notification Bell Alert
+                        if (lowStockCount > 0) {
+                            IconButton(
+                                onClick = {
+                                    isInventoryOpen = true
+                                    viewModel.openLowStockAlertSheet()
+                                },
+                                modifier = Modifier.testTag("low_stock_notification_button")
+                            ) {
+                                BadgedBox(
+                                    badge = {
+                                        Badge(
+                                            containerColor = if (lowStockRawIngredients.isNotEmpty()) Color(0xFFEF4444) else Color(0xFFF59E0B),
+                                            contentColor = Color.White
+                                        ) {
+                                            Text("$lowStockCount")
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.NotificationsActive,
+                                        contentDescription = "Low Stock Alerts",
+                                        tint = if (lowStockRawIngredients.isNotEmpty()) Color(0xFFEF4444) else Color(0xFFF59E0B)
+                                    )
+                                }
+                            }
+                        }
 
-                    // Day / Dark Mode Toggle Button
-                    IconButton(
-                        onClick = { viewModel.toggleDarkMode() },
-                        modifier = Modifier.testTag("toggle_dark_mode_button")
-                    ) {
-                        Icon(
-                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (isDarkMode) "Switch to Day Mode" else "Switch to Dark Mode",
-                            tint = if (isDarkMode) Color(0xFFFBBF24) else Slate800
-                        )
-                    }
-
-                    // Printer Configuration (Thermal, BT, WiFi, USB, LAN)
-                    IconButton(
-                        onClick = { showPrinterDialog = true },
-                        modifier = Modifier.testTag("printer_settings_top_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Print,
-                            contentDescription = "Printer Settings",
-                            tint = Emerald600
-                        )
-                    }
-
-                    // PC / Desktop Software Download button
-                    IconButton(
-                        onClick = { showPcDialog = true },
-                        modifier = Modifier.testTag("pc_software_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DesktopWindows,
-                            contentDescription = "Install on PC",
-                            tint = Sky600
-                        )
-                    }
-
-                    // Inventory & Menu management button
-                    IconButton(
-                        onClick = { isInventoryOpen = !isInventoryOpen },
-                        modifier = Modifier.testTag("inventory_toggle_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Inventory2,
-                            contentDescription = "Inventory",
-                            tint = if (isInventoryOpen) Emerald600 else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                        // Day / Dark Mode Toggle Button (Kept alone in top bar as requested)
+                        IconButton(
+                            onClick = { viewModel.toggleDarkMode() },
+                            modifier = Modifier.testTag("toggle_dark_mode_button")
+                        ) {
+                            Icon(
+                                imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = if (isDarkMode) "Switch to Day Mode" else "Switch to Dark Mode",
+                                tint = if (isDarkMode) Color(0xFFFBBF24) else Slate800
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
-        },
+            },
         bottomBar = {
             NavigationBar(
                 windowInsets = WindowInsets.navigationBars,
@@ -436,6 +576,7 @@ fun MainAppScaffold(viewModel: PosViewModel) {
             }
         }
     }
+    }
 
     // Modal Thermal Receipt Dialog (when an order is completed or inspected)
     lastCompletedOrder?.let { orderWithItems ->
@@ -453,5 +594,15 @@ fun MainAppScaffold(viewModel: PosViewModel) {
     // Printer Configuration Dialog (Thermal, Bluetooth, WiFi, USB, LAN)
     if (showPrinterDialog) {
         PrinterSettingsDialog(onDismiss = { showPrinterDialog = false })
+    }
+
+    // Cloud Real-Time Live Sales & Multi-Terminal Remote Monitor Dialog
+    if (showCloudSyncDialog) {
+        CloudSyncDialog(
+            todaySales = salesSummary.grossSales,
+            activeRunningTablesCount = activeTablesCount,
+            lowStockCount = lowStockCount,
+            onDismiss = { showCloudSyncDialog = false }
+        )
     }
 }

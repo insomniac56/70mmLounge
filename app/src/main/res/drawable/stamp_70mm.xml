@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Outer Stamp Ring -->
+    <path
+        android:strokeColor="#C026D3"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M 100,10 A 90,90 0 1,0 100,190 A 90,90 0 1,0 100,10" />
+
+    <!-- Inner Stamp Ring -->
+    <path
+        android:strokeColor="#C026D3"
+        android:strokeWidth="1.5"
+        android:pathData="M 100,18 A 82,82 0 1,0 100,182 A 82,82 0 1,0 100,18" />
+
+    <!-- Center Box Dividers -->
+    <path
+        android:strokeColor="#C026D3"
+        android:strokeWidth="2"
+        android:pathData="M 30,76 L 170,76 M 30,124 L 170,124" />
+
+    <!-- Stars -->
+    <path
+        android:fillColor="#C026D3"
+        android:pathData="M 38,100 L 40,94 L 46,94 L 41,90 L 43,84 L 38,88 L 33,84 L 35,90 L 30,94 L 36,94 Z" />
+    <path
+        android:fillColor="#C026D3"
+        android:pathData="M 162,100 L 164,94 L 170,94 L 165,90 L 167,84 L 162,88 L 157,84 L 159,90 L 154,94 L 160,94 Z" />
+
+    <!-- Stamp Text Paths / Bars -->
+    <path
+        android:fillColor="#C026D3"
+        android:pathData="M 48,93 L 152,93 L 152,97 L 48,97 Z M 52,103 L 148,103 L 148,106 L 52,106 Z" />
+</vector>

@@ -48,9 +48,11 @@ import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.Discount
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Restaurant
@@ -65,6 +67,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -89,6 +92,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -155,6 +159,62 @@ fun PosCheckoutScreen(
     val orderNotes by viewModel.orderNotes.collectAsStateWithLifecycle()
     val allTables by viewModel.allTables.collectAsStateWithLifecycle()
     val activeRunningTables by viewModel.activeRunningTables.collectAsStateWithLifecycle()
+    val activeBillRequestAlert by viewModel.activeBillRequestAlert.collectAsStateWithLifecycle()
+
+    // Real-Time Alert when customer clicks "Checkout / Complete Order" on mobile
+    if (activeBillRequestAlert != null) {
+        val alert = activeBillRequestAlert!!
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissBillRequestAlert() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = Amber500,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("🔔 Bill Requested!", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Table ${alert.tableNumber} (${alert.customerName.ifBlank { "Guest" }}) ne bill manga hai.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Customer has requested checkout on their mobile. Click below to load the table's cart and finalize bill.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Slate600
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val tbl = allTables.find { it.tableNumber.equals(alert.tableNumber, ignoreCase = true) }
+                        if (tbl != null) {
+                            viewModel.loadTableIntoPosCart(tbl)
+                        }
+                        viewModel.dismissBillRequestAlert()
+                        isCartOpen = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                ) {
+                    Text("Open Table Cart & Bill 📋")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissBillRequestAlert() }) {
+                    Text("Dismiss")
+                }
+            }
+        )
+    }
 
     val defaultCategories = listOf(
         "All",
@@ -191,6 +251,74 @@ fun PosCheckoutScreen(
                         .weight(1.35f)
                         .fillMaxHeight()
                 ) {
+                    // Running Tables Strip for Wide / Desktop Screen
+                    if (activeRunningTables.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            for (rt in activeRunningTables) {
+                                val isSelected = (selectedTableNumber == rt.tableNumber)
+                                val isReq = rt.isCheckoutRequested
+                                Surface(
+                                    onClick = { viewModel.loadTableIntoPosCart(rt) },
+                                    modifier = Modifier
+                                        .height(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .border(
+                                            width = if (isSelected || isReq) 1.8.dp else 1.dp,
+                                            color = if (isReq) Amber500 else if (isSelected) Emerald500 else Slate700,
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .testTag("pos_table_chip_desktop_${rt.tableNumber}"),
+                                    color = if (isReq) Amber500.copy(alpha = 0.2f)
+                                            else if (isSelected) Emerald600.copy(alpha = 0.2f)
+                                            else Slate900
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .padding(horizontal = 10.dp)
+                                            .fillMaxHeight(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isReq) Amber500 else Emerald500)
+                                        )
+                                        Text(
+                                            text = "T-${rt.tableNumber}" + if (rt.currentGuestName.isNotBlank()) " (${rt.currentGuestName.take(8)})" else "",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = Color.White,
+                                            maxLines = 1
+                                        )
+                                        Text(
+                                            text = "₹${String.format("%.0f", rt.currentBillAmount)}",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 11.sp,
+                                            color = if (isReq) Amber500 else Emerald600
+                                        )
+                                        if (isReq) {
+                                            Text(
+                                                text = "• Complete Order 🔔",
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 10.sp,
+                                                color = Amber500
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Search & Add Dish Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -244,8 +372,8 @@ fun PosCheckoutScreen(
                             modifier = Modifier.height(52.dp).testTag("pos_add_dish_button")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = Emerald600, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("+ Add Dish", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Add Menu", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
                         }
                     }
 
@@ -572,23 +700,34 @@ fun PosCheckoutScreen(
                             )
                         )
 
-                        // + Add Dish Button
+                        // + Add Menu Button
                         Surface(
                             onClick = { showAddDishDialog = true },
                             modifier = Modifier
-                                .size(52.dp)
+                                .height(52.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .border(1.dp, Slate700, RoundedCornerShape(12.dp))
                                 .testTag("pos_add_dish_button"),
                             color = Slate900,
                             contentColor = Emerald600
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Add Dish",
+                                    contentDescription = "Add Menu",
                                     tint = Emerald600,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Add",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color.White
                                 )
                             }
                         }
@@ -1342,6 +1481,8 @@ private fun CartCheckoutSheetContent(
     val customerPhone by viewModel.customerPhone.collectAsStateWithLifecycle()
     val paymentMethod by viewModel.paymentMethod.collectAsStateWithLifecycle()
     val cashTendered by viewModel.cashTendered.collectAsStateWithLifecycle()
+    val isUpiPaymentPending by viewModel.isUpiPaymentPending.collectAsStateWithLifecycle()
+    val isPaymentSuccessful by viewModel.isPaymentSuccessful.collectAsStateWithLifecycle()
 
     var showDiscountDialog by remember { mutableStateOf(false) }
     var showCustomerInputs by remember { mutableStateOf(customerName.isNotBlank() || customerPhone.isNotBlank()) }
@@ -1801,64 +1942,179 @@ private fun CartCheckoutSheetContent(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // Send KOT to Kitchen Button (for running / dine-in tables)
+        // Send KOT to Kitchen Button & Print KOT Slip Button (for running / dine-in tables)
         if (selectedTableNumber.isNotBlank()) {
-            Button(
-                onClick = {
-                    viewModel.sendKotToKitchen {
-                        kotSentNotice = true
-                    }
-                },
-                enabled = cartItems.isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .testTag("send_kot_button"),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (kotSentNotice) Emerald600 else Amber500,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(12.dp)
+            val context = LocalContext.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    if (kotSentNotice) Icons.Default.Check else Icons.Default.Restaurant,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (kotSentNotice) "KOT Sent to Kitchen! ✓" else "Send KOT to Kitchen",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                // Send KOT to Kitchen button
+                Button(
+                    onClick = {
+                        viewModel.sendKotToKitchen {
+                            kotSentNotice = true
+                        }
+                    },
+                    enabled = cartItems.isNotEmpty(),
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .height(48.dp)
+                        .testTag("send_kot_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (kotSentNotice) Emerald600 else Amber500,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        if (kotSentNotice) Icons.Default.Check else Icons.Default.Restaurant,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (kotSentNotice) "KOT Sent! ✓" else "Send KOT to Kitchen",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        maxLines = 1
+                    )
+                }
+
+                // KOT Slip Cut / Print Button (matches KOT page slip button)
+                OutlinedButton(
+                    onClick = {
+                        viewModel.cutAndPrintKotSlip(context) {
+                            kotSentNotice = true
+                        }
+                    },
+                    enabled = cartItems.isNotEmpty(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .testTag("cart_print_kot_slip_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Slate900,
+                        contentColor = Color.White
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Amber500),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Print,
+                        contentDescription = "Cut & Print KOT Slip",
+                        modifier = Modifier.size(18.dp),
+                        tint = Amber500
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "KOT Slip 🖨️",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        maxLines = 1
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(10.dp))
         }
 
-        // Complete Sale / Settle Bill Button
-        Button(
-            onClick = {
-                viewModel.completeCheckout {
-                    onClose()
+        // Complete Sale / Settle Bill Button (with UPI Pending Loader & Success State)
+        when {
+            isPaymentSuccessful -> {
+                Button(
+                    onClick = {},
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Payment Successful! ✅", fontWeight = FontWeight.Bold, color = Color.White)
                 }
-            },
-            enabled = cartItems.isNotEmpty(),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .testTag("complete_sale_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Text(
-                text = if (selectedTableNumber.isNotBlank())
-                    "Checkout Table $selectedTableNumber • ${CurrencyFormatter.format(grandTotal)}"
-                else
-                    "Complete Sale • ${CurrencyFormatter.format(grandTotal)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            }
+            isUpiPaymentPending -> {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = {},
+                        colors = ButtonDefaults.buttonColors(containerColor = Amber500),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Payment Pending ⏳ (Waiting for Customer UPI...)",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { viewModel.cancelUpiPaymentPending() },
+                            modifier = Modifier.weight(1f).height(40.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Cancel", fontSize = 12.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.confirmUpiPaymentAndComplete {
+                                    onClose()
+                                }
+                            },
+                            modifier = Modifier.weight(1.5f).height(40.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Mark Paid / Settle ✅", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            else -> {
+                Button(
+                    onClick = {
+                        viewModel.initiateCheckout {
+                            onClose()
+                        }
+                    },
+                    enabled = cartItems.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("complete_sale_button"),
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = if (selectedTableNumber.isNotBlank())
+                            "Checkout Table $selectedTableNumber • ${CurrencyFormatter.format(grandTotal)}"
+                        else
+                            "Complete Sale • ${CurrencyFormatter.format(grandTotal)}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
         }
     }
 

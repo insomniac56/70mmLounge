@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,19 +18,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.asImageBitmap
 import com.example.util.PrinterManager
+import com.example.util.QrCodeGenerator
+import java.util.Locale
 import kotlinx.coroutines.launch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -301,45 +309,56 @@ fun ReceiptDialog(
                         ReceiptDottedDivider()
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Calculations summary
-                        ReceiptSummaryRow("Items Subtotal", CurrencyFormatter.format(order.subtotal))
-
-                        if (order.discountAmount > 0) {
-                            ReceiptSummaryRow(
-                                "Discount" + if (order.discountPercent > 0) " (${order.discountPercent.toInt()}%)" else "",
-                                "- ${CurrencyFormatter.format(order.discountAmount)}",
-                                isDiscount = true
+                        // Calculations summary with Official 70MM Lounge Stamp Watermark
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            // Stamp Watermark overlay (with alpha 0.22f so all text is 100% visible)
+                            LoungeOfficialStamp(
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(vertical = 4.dp)
                             )
-                        }
 
-                        // GST breakdown (CGST + SGST)
-                        val halfTax = order.taxAmount / 2.0
-                        ReceiptSummaryRow("Central GST (CGST)", CurrencyFormatter.format(halfTax))
-                        ReceiptSummaryRow("State GST (SGST)", CurrencyFormatter.format(halfTax))
-                        ReceiptSummaryRow("Total GST Tax", CurrencyFormatter.format(order.taxAmount))
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                ReceiptSummaryRow("Items Subtotal", CurrencyFormatter.format(order.subtotal))
 
-                        Spacer(modifier = Modifier.height(6.dp))
-                        HorizontalDivider(color = Slate900, thickness = 1.dp)
-                        Spacer(modifier = Modifier.height(6.dp))
+                                if (order.discountAmount > 0) {
+                                    ReceiptSummaryRow(
+                                        "Discount" + if (order.discountPercent > 0) " (${order.discountPercent.toInt()}%)" else "",
+                                        "- ${CurrencyFormatter.format(order.discountAmount)}",
+                                        isDiscount = true
+                                    )
+                                }
 
-                        // Grand Total
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "TOTAL AMOUNT",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Black,
-                                color = Slate900
-                            )
-                            Text(
-                                text = CurrencyFormatter.format(order.totalAmount),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Black,
-                                color = Emerald600
-                            )
+                                // GST breakdown (CGST + SGST)
+                                val halfTax = order.taxAmount / 2.0
+                                ReceiptSummaryRow("Central GST (CGST)", CurrencyFormatter.format(halfTax))
+                                ReceiptSummaryRow("State GST (SGST)", CurrencyFormatter.format(halfTax))
+                                ReceiptSummaryRow("Total GST Tax", CurrencyFormatter.format(order.taxAmount))
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                HorizontalDivider(color = Slate900, thickness = 1.dp)
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                // Grand Total
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "TOTAL AMOUNT",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Black,
+                                        color = Slate900
+                                    )
+                                    Text(
+                                        text = CurrencyFormatter.format(order.totalAmount),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Black,
+                                        color = Emerald600
+                                    )
+                                }
+                            }
                         }
 
                         if (order.notes.isNotBlank()) {
@@ -352,9 +371,80 @@ fun ReceiptDialog(
                             )
                         }
 
+                        // Dynamic UPI QR Code Section (Instant Payment with exact bill amount)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color.White,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Slate200)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.QrCode2,
+                                        contentDescription = null,
+                                        tint = Emerald600,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "SCAN TO PAY (INSTANT UPI)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Black,
+                                        color = Slate900,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val upiAmount = String.format(Locale.US, "%.2f", order.totalAmount)
+                                val upiUri = "upi://pay?pa=8987477773@okbizaxis&pn=70MM%20Lounge&am=$upiAmount&cu=INR&tn=Bill-${order.invoiceNumber}"
+                                val qrBitmap: Bitmap? = remember(upiUri) {
+                                    QrCodeGenerator.generateQrBitmap(upiUri, 320)
+                                }
+                                if (qrBitmap != null) {
+                                    Image(
+                                        bitmap = qrBitmap.asImageBitmap(),
+                                        contentDescription = "Dynamic UPI Payment QR",
+                                        modifier = Modifier
+                                            .size(140.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.White)
+                                            .border(1.dp, Slate200, RoundedCornerShape(8.dp))
+                                            .padding(6.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Amount to Pay: ₹$upiAmount",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = Emerald600
+                                )
+                                Text(
+                                    text = "UPI: 8987477773@okbizaxis",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Slate700
+                                )
+                                Text(
+                                    text = "Google Pay • PhonePe • Paytm • BHIM",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Slate500,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "*** THANK YOU FOR SHOPPING! ***",
+                            text = "*** 70MM LOUNGE • THANK YOU VISIT AGAIN ***",
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center,
@@ -576,3 +666,69 @@ private fun shareReceiptAsText(context: Context, orderWithItems: OrderWithItems)
     }
     context.startActivity(Intent.createChooser(intent, "Share Receipt"))
 }
+
+@Composable
+fun LoungeOfficialStamp(
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(130.dp)
+            .rotate(-14f)
+            .border(2.5.dp, Color(0xFFBE185D).copy(alpha = 0.28f), CircleShape)
+            .padding(4.dp)
+            .border(1.dp, Color(0xFFBE185D).copy(alpha = 0.22f), CircleShape)
+            .padding(8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "★ 70MM LOUNGE ★",
+                color = Color(0xFFBE185D).copy(alpha = 0.32f),
+                fontWeight = FontWeight.Black,
+                fontSize = 9.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            HorizontalDivider(
+                color = Color(0xFFBE185D).copy(alpha = 0.28f),
+                thickness = 1.dp,
+                modifier = Modifier.fillMaxWidth(0.85f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "PAID & VERIFIED",
+                color = Color(0xFFBE185D).copy(alpha = 0.35f),
+                fontWeight = FontWeight.Black,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                letterSpacing = 0.5.sp
+            )
+            Text(
+                text = "RESTAURANT & CLUB",
+                color = Color(0xFFBE185D).copy(alpha = 0.30f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 7.5.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            HorizontalDivider(
+                color = Color(0xFFBE185D).copy(alpha = 0.28f),
+                thickness = 1.dp,
+                modifier = Modifier.fillMaxWidth(0.85f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "BOKARO STEEL CITY",
+                color = Color(0xFFBE185D).copy(alpha = 0.28f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 7.5.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+

@@ -175,6 +175,32 @@ object QrCodeGenerator {
     }
 
     /**
+     * Generates a square Android Bitmap QR code for dynamic UPI and cloud sync display.
+     */
+    fun generateQrBitmap(data: String, size: Int = 320): Bitmap {
+        val matrix = generateQrMatrix(data)
+        val rows = matrix.size
+        val cols = if (rows > 0) matrix[0].size else 1
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = AndroidCanvas(bitmap)
+        canvas.drawColor(AndroidColor.WHITE)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.BLACK
+            style = Paint.Style.FILL
+        }
+        val moduleWidth = size.toFloat() / cols
+        val moduleHeight = size.toFloat() / rows
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                if (matrix[r][c]) {
+                    canvas.drawRect(c * moduleWidth, r * moduleHeight, (c + 1) * moduleWidth, (r + 1) * moduleHeight, paint)
+                }
+            }
+        }
+        return bitmap
+    }
+
+    /**
      * Creates a high-resolution printable Bitmap standee graphic for a table.
      */
     fun createTableStandeeBitmap(

@@ -1,7 +1,11 @@
 package com.example.util
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.example.data.model.SalesSummary
@@ -119,6 +123,64 @@ object ExcelExporter {
         } catch (e: Exception) {
             e.printStackTrace()
             null
+        }
+    }
+
+    fun downloadExcelReport(context: Context, summary: SalesSummary): File? {
+        val file = exportSalesReportToExcel(context, summary)
+        if (file == null || !file.exists()) {
+            Toast.makeText(context, "Failed to generate Excel report file", Toast.LENGTH_SHORT).show()
+            return null
+        }
+
+        try {
+            val fileName = file.name
+            var savedFile: File? = null
+
+            // Copy to public Downloads directory for 1-click easy access
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/70mmLounge")
+                }
+                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+                if (uri != null) {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        file.inputStream().use { input ->
+                            input.copyTo(output)
+                        }
+                    }
+                    Toast.makeText(context, "✅ Downloaded: Downloads/70mmLounge/$fileName", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) downloadsDir.mkdirs()
+                val targetFile = File(downloadsDir, fileName)
+                file.copyTo(targetFile, overwrite = true)
+                savedFile = targetFile
+                Toast.makeText(context, "✅ Downloaded to Downloads/$fileName", Toast.LENGTH_LONG).show()
+            }
+
+            return savedFile ?: file
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(context, "Saved to cache: ${file.name}", Toast.LENGTH_LONG).show()
+            return file
+        }
+    }
+
+    fun openDownloadedFile(context: Context, file: File) {
+        try {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "text/csv")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(Intent.createChooser(viewIntent, "Open Excel / CSV Report"))
+        } catch (e: Exception) {
+            Toast.makeText(context, "No app found to open CSV: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 

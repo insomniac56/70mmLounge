@@ -384,13 +384,6 @@ object DatabaseSeeder {
             dao.insertAllTables(sampleTables)
         }
 
-        // Clean up legacy demo orders and demo KOTs so app starts 100% clean & fresh
-        if (dao.getOrderCount() == 1) {
-            dao.deleteAllOrders()
-            dao.deleteAllOrderItems()
-        }
-        if (dao.getKotCount() <= 3) {
-            dao.deleteAllKots()
-        }
+        // Never delete user orders or KOTs - ensure 100% data persistence across restarts
     }
 }

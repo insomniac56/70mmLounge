@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -42,6 +43,7 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +93,58 @@ fun ReportsScreen(
     val salesSummary by viewModel.currentSalesSummary.collectAsStateWithLifecycle()
 
     val ranges = ReportTimeRange.values()
+    var downloadedExcelFile by remember { mutableStateOf<java.io.File?>(null) }
+
+    if (downloadedExcelFile != null) {
+        val file = downloadedExcelFile!!
+        AlertDialog(
+            onDismissRequest = { downloadedExcelFile = null },
+            title = {
+                Text("📊 Excel Report Downloaded", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column {
+                    Text(
+                        "File downloaded successfully to your device Downloads folder:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        file.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Emerald600
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        ExcelExporter.openDownloadedFile(context, file)
+                        downloadedExcelFile = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald600)
+                ) {
+                    Text("Open File 📂")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            ExcelExporter.shareExcelReport(context, salesSummary)
+                            downloadedExcelFile = null
+                        }
+                    ) {
+                        Text("Share 📤")
+                    }
+                    TextButton(onClick = { downloadedExcelFile = null }) {
+                        Text("Close")
+                    }
+                }
+            }
+        )
+    }
 
     Column(
         modifier = modifier
@@ -141,10 +195,13 @@ fun ReportsScreen(
                     Text("WhatsApp", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
                 }
 
-                // Export to Excel / CSV Button
+                // Export to Excel / CSV Button (1-Click Download + Share)
                 OutlinedButton(
                     onClick = {
-                        ExcelExporter.shareExcelReport(context, salesSummary)
+                        val file = ExcelExporter.downloadExcelReport(context, salesSummary)
+                        if (file != null) {
+                            downloadedExcelFile = file
+                        }
                     },
                     modifier = Modifier.testTag("export_excel_button"),
                     shape = RoundedCornerShape(10.dp),

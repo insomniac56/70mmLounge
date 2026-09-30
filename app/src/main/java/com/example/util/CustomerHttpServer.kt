@@ -34,10 +34,26 @@ object CustomerHttpServer {
     private var serverSocket: ServerSocket? = null
     private var isRunning = false
     private var repository: PosRepository? = null
+    private var appContext: Context? = null
+
+    private val activeBills = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
+
+    fun setTableBill(tableNumber: String, bill: JSONObject) {
+        activeBills[tableNumber.trim().uppercase()] = bill
+    }
+
+    fun clearTableBill(tableNumber: String) {
+        activeBills.remove(tableNumber.trim().uppercase())
+    }
+
+    fun getTableBill(tableNumber: String): JSONObject? {
+        return activeBills[tableNumber.trim().uppercase()]
+    }
 
     fun start(context: Context, repo: PosRepository, port: Int = DEFAULT_PORT) {
         if (isRunning) return
         repository = repo
+        appContext = context.applicationContext
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -137,8 +153,8 @@ object CustomerHttpServer {
                     method == "OPTIONS" -> {
                         sendResponse(output, 200, "text/plain", "OK", allowCors = true)
                     }
-                    path == "/" || path == "/order" -> {
-                        val table = queryParams["table"] ?: "T1"
+                    path == "/" || path == "/order" || path == "/pos-menu.html" || path == "/menu.html" -> {
+                        val table = queryParams["table"] ?: "C-1"
                         val zone = queryParams["zone"] ?: "Club area"
                         val html = generateCustomerMenuHtml(table, zone)
                         sendResponse(output, 200, "text/html; charset=UTF-8", html, allowCors = true)
@@ -165,6 +181,7 @@ object CustomerHttpServer {
                         val table = repository?.allTables?.firstOrNull()?.find { it.tableNumber.equals(tableNum, ignoreCase = true) }
                         val kots = repository?.allKots?.firstOrNull() ?: emptyList()
                         val latestKot = kots.firstOrNull { it.tableNumber.equals(tableNum, ignoreCase = true) }
+                        val activeBill = getTableBill(tableNum)
 
                         val obj = JSONObject()
                         obj.put("tableNumber", tableNum)
@@ -173,7 +190,38 @@ object CustomerHttpServer {
                         obj.put("billAmount", table?.currentBillAmount ?: 0.0)
                         obj.put("isCheckoutRequested", table?.isCheckoutRequested ?: false)
                         obj.put("kotStatus", latestKot?.status ?: "NONE")
+                        if (activeBill != null) {
+                            obj.put("bill", activeBill)
+                        }
                         sendResponse(output, 200, "application/json", obj.toString(), allowCors = true)
+                    }
+                    path == "/api/bill" -> {
+                        val tableNum = queryParams["table"] ?: ""
+                        val activeBill = getTableBill(tableNum)
+                        if (activeBill != null) {
+                            sendResponse(output, 200, "application/json", activeBill.toString(), allowCors = true)
+                        } else {
+                            sendResponse(output, 404, "application/json", "{\"error\":\"No active bill\"}", allowCors = true)
+                        }
+                    }
+                    path == "/api/confirm-payment" && method == "POST" -> {
+                        try {
+                            val json = if (body.isNotBlank() && body.trim().startsWith("{")) JSONObject(body) else JSONObject()
+                            val tableNum = json.optString("tableNumber", queryParams["table"] ?: "")
+                            val amount = json.optDouble("amount", 0.0)
+                            if (tableNum.isNotBlank()) {
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    CloudOrderRelay.publishBillToCustomer(tableNum, JSONObject().apply {
+                                        put("type", "PAYMENT_CONFIRMED")
+                                        put("tableNumber", tableNum)
+                                        put("amount", amount)
+                                    })
+                                }
+                            }
+                            sendResponse(output, 200, "application/json", "{\"success\":true,\"message\":\"Payment registered\"}", allowCors = true)
+                        } catch (e: Exception) {
+                            sendResponse(output, 400, "application/json", "{\"error\":\"Invalid request\"}", allowCors = true)
+                        }
                     }
                     path == "/api/order" && method == "POST" -> {
                         handleOrderPost(body, output)
@@ -324,6 +372,22 @@ object CustomerHttpServer {
      * Generates a sleek, modern, mobile-optimized HTML5/CSS3/JavaScript customer self-ordering menu.
      */
     private suspend fun generateCustomerMenuHtml(tableNumber: String, zone: String): String {
+        try {
+            appContext?.assets?.open("pos-menu.html")?.use { inputStream ->
+                val html = inputStream.bufferedReader(StandardCharsets.UTF_8).readText()
+                val port = getPort()
+                val ip = getLocalIpAddress()
+                return html
+                    .replace("localStorage.getItem('70mm_table') || 'C-1'", "localStorage.getItem('70mm_table') || '$tableNumber'")
+                    .replace("localStorage.getItem('70mm_zone') || 'Club area'", "localStorage.getItem('70mm_zone') || '$zone'")
+                    .replace("localStorage.getItem('70mm_pos_host') || ''", "localStorage.getItem('70mm_pos_host') || '$ip:$port'")
+                    .replace("TABLE C-1", "TABLE $tableNumber")
+                    .replace("CLUB AREA", zone.uppercase())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading pos-menu.html from assets, falling back to embedded template", e)
+        }
+
         val products = repository?.allProducts?.firstOrNull() ?: emptyList()
         val productsJson = JSONArray()
         for (p in products) {

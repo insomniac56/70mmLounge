@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.DatabaseSeeder
@@ -20,6 +21,7 @@ import com.example.data.model.SaleOrderItem
 import com.example.data.model.SalesSummary
 import com.example.data.model.TopSellingProduct
 import com.example.data.repository.PosRepository
+import com.example.util.PrinterManager
 import com.example.util.TableUrlGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -48,6 +50,42 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         // Seed initial inventory and demo orders if empty
         viewModelScope.launch(Dispatchers.IO) {
             DatabaseSeeder.seedIfNeeded(db.posDao())
+        }
+
+        // Listen for real-time bill checkout requests from customer mobile phones
+        viewModelScope.launch {
+            com.example.util.CloudOrderRelay.billRequestAlertFlow.collect { alert ->
+                _activeBillRequestAlert.value = alert
+            }
+        }
+
+        // Listen for real-time UPI customer payment confirmations
+        viewModelScope.launch {
+            com.example.util.CloudOrderRelay.paymentConfirmedFlow.collect { payment ->
+                if (_selectedTableNumber.value.equals(payment.tableNumber, ignoreCase = true) && _isUpiPaymentPending.value) {
+                    _isUpiPaymentPending.value = false
+                    _isPaymentSuccessful.value = true
+                    kotlinx.coroutines.delay(1200)
+                    completeCheckout {
+                        _isPaymentSuccessful.value = false
+                    }
+                }
+            }
+        }
+
+        // Real-time cart synchronization: when customer adds items via mobile, update POS cart immediately
+        viewModelScope.launch {
+            repository.allKots.collect { kots ->
+                val currentTable = _selectedTableNumber.value
+                if (currentTable.isNotBlank()) {
+                    val tableKots = kots.filter {
+                        it.tableNumber.equals(currentTable, ignoreCase = true) && it.status != "SERVED" && it.status != "CANCELLED"
+                    }
+                    if (tableKots.isNotEmpty()) {
+                        refreshCartFromKots(currentTable, tableKots)
+                    }
+                }
+            }
         }
     }
 
@@ -403,47 +441,55 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         _selectedTableNumber.value = tableNum
         _selectedOrderType.value = "Dine-in"
 
-        val draft = _tableDrafts[tableNum]
-        if (draft != null) {
-            _cartItems.value = draft.cartItems
-            _customerName.value = draft.customerName.ifBlank { table.currentGuestName }
-            _customerPhone.value = draft.customerPhone
-            _guestCount.value = draft.guestCount
-            _serverName.value = draft.serverName
-            _orderNotes.value = draft.orderNotes
-            _billDiscountPercent.value = draft.billDiscountPercent
+        // Parse customer name and phone
+        val rawGuest = table.currentGuestName
+        val phoneRegex = Regex("""\b(\d{10})\b""")
+        val phoneMatch = phoneRegex.find(rawGuest)
+        val parsedPhone = phoneMatch?.value ?: ""
+        val parsedName = if (parsedPhone.isNotBlank()) {
+            rawGuest.replace(parsedPhone, "").replace("(", "").replace(")", "").trim()
         } else {
-            _customerName.value = table.currentGuestName
-            _customerPhone.value = ""
-            _orderNotes.value = ""
-            _billDiscountPercent.value = 0.0
+            rawGuest.trim()
+        }
 
-            viewModelScope.launch(Dispatchers.IO) {
-                val activeKotsForTable = repository.allKots.firstOrNull()?.filter {
-                    it.tableNumber.equals(tableNum, ignoreCase = true) && it.status != "CANCELLED"
-                } ?: emptyList()
+        _customerName.value = parsedName.ifBlank { "Table $tableNum Guest" }
+        _customerPhone.value = parsedPhone
 
-                val productsList = repository.allProducts.firstOrNull() ?: emptyList()
-                val newCart = mutableListOf<CartItem>()
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeKotsForTable = repository.allKots.firstOrNull()?.filter {
+                it.tableNumber.equals(tableNum, ignoreCase = true) && it.status != "SERVED" && it.status != "CANCELLED"
+            } ?: emptyList()
 
-                for (kot in activeKotsForTable) {
-                    val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
-                    for (itemLine in items) {
-                        val parsed = parseItemSummaryLine(itemLine)
-                        val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
-                        if (prod != null) {
-                            val existing = newCart.indexOfFirst { it.product.id == prod.id }
-                            if (existing >= 0) {
-                                newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
-                            } else {
-                                newCart.add(CartItem(product = prod, quantity = parsed.qty))
-                            }
-                        }
+            val productsList = repository.allProducts.firstOrNull() ?: emptyList()
+            val newCart = mutableListOf<CartItem>()
+
+            for (kot in activeKotsForTable) {
+                val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+                for (itemLine in items) {
+                    val parsed = parseItemSummaryLine(itemLine)
+                    val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
+                        ?: ProductItem(
+                            name = parsed.name,
+                            category = "Special",
+                            sku = "ITEM-${parsed.name.hashCode()}",
+                            sellingPrice = 150.0,
+                            stockQuantity = 999
+                        )
+                    val existing = newCart.indexOfFirst { it.product.name.equals(prod.name, ignoreCase = true) }
+                    if (existing >= 0) {
+                        newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
+                    } else {
+                        newCart.add(CartItem(product = prod, quantity = parsed.qty))
                     }
                 }
+            }
 
-                if (newCart.isNotEmpty()) {
-                    _cartItems.value = newCart
+            if (newCart.isNotEmpty()) {
+                _cartItems.value = newCart
+            } else {
+                val draft = _tableDrafts[tableNum]
+                if (draft != null && draft.cartItems.isNotEmpty()) {
+                    _cartItems.value = draft.cartItems
                 } else if (table.currentBillAmount > 0) {
                     val customDish = productsList.firstOrNull() ?: ProductItem(
                         name = "Table ${table.tableNumber} Food & Beverages",
@@ -456,8 +502,8 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     _cartItems.value = emptyList()
                 }
-                saveCurrentTableDraft()
             }
+            saveCurrentTableDraft()
         }
     }
 
@@ -789,6 +835,64 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Cuts and prints KOT slip immediately to the thermal printer (ESC/POS auto-cut)
+     * Directly accessible from Cart page beside Send KOT to Kitchen button.
+     */
+    fun cutAndPrintKotSlip(context: Context, onSuccess: (() -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val items = _cartItems.value
+            val tableNum = _selectedTableNumber.value
+            val allTablesList = repository.allTables.firstOrNull() ?: emptyList()
+            val table = allTablesList.find { it.tableNumber.equals(tableNum, ignoreCase = true) }
+            val zone = table?.zone ?: "Main Lounge"
+
+            if (items.isNotEmpty()) {
+                val kotCount = repository.getKotCount()
+                val kotNumber = "KOT-${101 + kotCount}"
+                val itemsSummary = items.joinToString("\n") { "${it.quantity}x ${it.product.name}" }
+                val kot = KitchenOrderTicket(
+                    kotNumber = kotNumber,
+                    tableNumber = tableNum.ifBlank { "Takeaway" },
+                    zone = zone,
+                    customerName = _customerName.value.ifBlank { "Guest" },
+                    timestamp = System.currentTimeMillis(),
+                    status = "NEW",
+                    section = "RESTAURANT",
+                    itemsSummary = itemsSummary,
+                    specialNotes = _orderNotes.value
+                )
+                repository.insertKot(kot)
+                saveCurrentTableDraft()
+
+                _kotAlertFlow.emit(
+                    KotAlertEvent(
+                        areaName = zone,
+                        tableNumber = tableNum.ifBlank { "Takeaway" },
+                        isAddon = false
+                    )
+                )
+
+                // Print physical KOT slip with auto-cut
+                PrinterManager.printKot(context, kot)
+
+                launch(Dispatchers.Main) {
+                    onSuccess?.invoke()
+                }
+            } else {
+                // If cart is currently empty, print the latest KOT slip for this table
+                val latestKots = repository.allKots.firstOrNull() ?: emptyList()
+                val tableKot = latestKots.find { it.tableNumber.equals(tableNum, ignoreCase = true) }
+                if (tableKot != null) {
+                    PrinterManager.printKot(context, tableKot)
+                    launch(Dispatchers.Main) {
+                        onSuccess?.invoke()
+                    }
+                }
+            }
+        }
+    }
+
     fun clearActiveOrder() {
         clearCart()
         _selectedTableNumber.value = ""
@@ -867,6 +971,124 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
         }
         total
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // --- UPI Payment Pending & Bill Alert States ---
+    private val _isUpiPaymentPending = MutableStateFlow(false)
+    val isUpiPaymentPending: StateFlow<Boolean> = _isUpiPaymentPending.asStateFlow()
+
+    private val _isPaymentSuccessful = MutableStateFlow(false)
+    val isPaymentSuccessful: StateFlow<Boolean> = _isPaymentSuccessful.asStateFlow()
+
+    private val _activeBillRequestAlert = MutableStateFlow<com.example.util.CloudOrderRelay.BillRequestAlert?>(null)
+    val activeBillRequestAlert: StateFlow<com.example.util.CloudOrderRelay.BillRequestAlert?> = _activeBillRequestAlert.asStateFlow()
+
+    fun dismissBillRequestAlert() {
+        _activeBillRequestAlert.value = null
+    }
+
+    fun initiateCheckout(onSuccess: (OrderWithItems) -> Unit) {
+        val tableNum = _selectedTableNumber.value.trim()
+        val pMethod = _paymentMethod.value
+
+        if (pMethod == "UPI" && tableNum.isNotBlank()) {
+            pushBillToCustomerDevice(tableNum)
+            _isUpiPaymentPending.value = true
+            _isPaymentSuccessful.value = false
+        } else {
+            completeCheckout(onSuccess)
+        }
+    }
+
+    fun confirmUpiPaymentAndComplete(onSuccess: (OrderWithItems) -> Unit) {
+        _isUpiPaymentPending.value = false
+        _isPaymentSuccessful.value = true
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(1000)
+            completeCheckout(onSuccess)
+            _isPaymentSuccessful.value = false
+        }
+    }
+
+    fun cancelUpiPaymentPending() {
+        _isUpiPaymentPending.value = false
+        _isPaymentSuccessful.value = false
+    }
+
+    fun pushBillToCustomerDevice(tableNumber: String) {
+        val items = _cartItems.value
+        val subtotal = items.sumOf { it.subtotal }
+        val billDiscPercent = _billDiscountPercent.value
+        val billFactor = 1.0 - (billDiscPercent / 100.0)
+        var totalTax = 0.0
+        var grandTotal = 0.0
+        val itemsArray = org.json.JSONArray()
+
+        for (item in items) {
+            val effTaxable = item.taxableAmount * billFactor
+            val itemTax = effTaxable * (item.product.gstRate / 100.0)
+            val lineTotal = effTaxable + itemTax
+            totalTax += itemTax
+            grandTotal += lineTotal
+
+            val itObj = org.json.JSONObject().apply {
+                put("name", item.product.name)
+                put("quantity", item.quantity)
+                put("rate", item.product.sellingPrice)
+                put("amount", lineTotal)
+            }
+            itemsArray.put(itObj)
+        }
+
+        val roundedTotal = kotlin.math.round(grandTotal)
+        val roundOff = roundedTotal - grandTotal
+
+        val billPayload = org.json.JSONObject().apply {
+            put("type", "BILL_READY")
+            put("tableNumber", tableNumber)
+            put("customerName", _customerName.value.ifBlank { "Table $tableNumber Guest" })
+            put("customerPhone", _customerPhone.value)
+            put("subtotal", subtotal)
+            put("taxAmount", totalTax)
+            put("roundOff", roundOff)
+            put("grandTotal", roundedTotal)
+            put("items", itemsArray)
+            put("upiQr", "upi://pay?pa=8987477773@okbizaxis&pn=70mm%20Lounge&am=${String.format(java.util.Locale.US, "%.2f", roundedTotal)}&cu=INR")
+            put("timestamp", System.currentTimeMillis())
+        }
+
+        com.example.util.CustomerHttpServer.setTableBill(tableNumber, billPayload)
+        com.example.util.CloudOrderRelay.publishBillToCustomer(tableNumber, billPayload)
+    }
+
+    fun refreshCartFromKots(tableNumber: String, kots: List<KitchenOrderTicket>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val productsList = repository.allProducts.firstOrNull() ?: emptyList()
+            val newCart = mutableListOf<CartItem>()
+            for (kot in kots) {
+                val items = kot.itemsSummary.split(";").map { it.trim() }.filter { it.isNotEmpty() }
+                for (itemLine in items) {
+                    val parsed = parseItemSummaryLine(itemLine)
+                    val prod = productsList.find { it.name.equals(parsed.name, ignoreCase = true) }
+                        ?: ProductItem(
+                            name = parsed.name,
+                            category = "Special",
+                            sku = "ITEM-${parsed.name.hashCode()}",
+                            sellingPrice = 150.0,
+                            stockQuantity = 999
+                        )
+                    val existing = newCart.indexOfFirst { it.product.name.equals(prod.name, ignoreCase = true) }
+                    if (existing >= 0) {
+                        newCart[existing] = newCart[existing].copy(quantity = newCart[existing].quantity + parsed.qty)
+                    } else {
+                        newCart.add(CartItem(product = prod, quantity = parsed.qty))
+                    }
+                }
+            }
+            if (newCart.isNotEmpty()) {
+                _cartItems.value = newCart
+            }
+        }
+    }
 
     fun completeCheckout(onSuccess: (OrderWithItems) -> Unit) {
         val items = _cartItems.value
@@ -958,6 +1180,8 @@ class PosViewModel(application: Application) : AndroidViewModel(application) {
                 for (kot in kotsForTable) {
                     repository.updateKotStatus(kot.kotId, "SERVED")
                 }
+                com.example.util.CustomerHttpServer.clearTableBill(tableNum)
+                com.example.util.CloudOrderRelay.publishSettlementToCustomer(tableNum)
             }
             val completedOrderWithItems = OrderWithItems(
                 order = order.copy(orderId = orderId),

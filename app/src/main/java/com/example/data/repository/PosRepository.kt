@@ -231,32 +231,19 @@ class PosRepository(private val dao: PosDao) {
         dao.insertOrderItems(itemsWithOrderId)
 
         // Deduct inventory for each purchased item
-        for (cartItem in cart) {
-            dao.adjustProductStock(cartItem.product.id, -cartItem.quantity)
+        if (order.orderType != "QR_DINE_IN") {
+            for (cartItem in cart) {
+                dao.adjustProductStock(cartItem.product.id, -cartItem.quantity)
+            }
         }
 
-        // Also create a KOT for the kitchen
-        val kotNumber = "KOT-${101 + dao.getKotCount()}"
-        val itemsSummary = cart.joinToString(" ; ") { "${it.quantity}x ${it.product.name}" }
-        dao.insertKot(
-            KitchenOrderTicket(
-                kotNumber = kotNumber,
-                tableNumber = tableNumber?.ifBlank { "Takeout / Walk-in" } ?: "Counter",
-                customerName = order.customerName,
-                timestamp = System.currentTimeMillis(),
-                status = "NEW",
-                section = "KITCHEN",
-                itemsSummary = itemsSummary,
-                specialNotes = order.notes
-            )
-        )
-
-        // If this sale was for a table, vacate the table
+        // If this sale was for a table, vacate the table and clear its active KOTs so they never reappear in kitchen
         if (!tableNumber.isNullOrBlank()) {
             val table = dao.getTableByNumber(tableNumber)
             if (table != null) {
                 dao.vacateTable(table.tableId)
             }
+            dao.clearActiveKotsForTable(tableNumber)
         }
 
         return orderId

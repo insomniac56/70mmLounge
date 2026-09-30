@@ -61,7 +61,7 @@
       position: sticky;
       top: 0;
       z-index: 30;
-      background: rgba(9, 13, 22, 0.90);
+      background: rgba(9, 13, 22, 0.94);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--surface-border);
@@ -101,52 +101,48 @@
 
     @keyframes pulseDot {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.85); }
+      50% { opacity: 0.4; transform: scale(0.85); }
     }
 
     .table-badge {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: var(--card-bg);
+      border: 1px solid var(--surface-border);
       padding: 6px 12px;
       border-radius: 12px;
+      text-align: right;
     }
 
     .table-badge .tbl-num {
       font-size: 13px;
-      font-weight: 900;
-      color: #34d399;
-      letter-spacing: 0.5px;
+      font-weight: 800;
+      color: var(--primary);
+      display: block;
     }
 
     .table-badge .tbl-zone {
       font-size: 10px;
-      font-weight: 700;
-      color: #94a3b8;
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
     }
 
-    /* Main Content Wrapper */
+    /* Main Container */
     .main-wrap {
-      max-width: 720px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 14px 16px;
+      padding: 16px;
       position: relative;
-      z-index: 1;
+      z-index: 10;
+      flex: 1;
     }
 
-    /* Live Active Order Status Card (Visible after customer places order or table is occupied) */
+    /* Running Order Status Card */
     .status-card {
-      display: none;
-      background: linear-gradient(145deg, #131d2e 0%, #0d1523 100%);
-      border: 1.5px solid rgba(245, 158, 11, 0.5);
-      box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.2);
-      border-radius: 18px;
+      background: linear-gradient(145deg, #111827 0%, #0f172a 100%);
+      border: 1.5px solid var(--accent);
+      border-radius: 16px;
       padding: 16px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 10px 30px -5px var(--accent-glow);
+      display: none;
       animation: pulseGlow 2.5s infinite;
     }
 
@@ -200,8 +196,19 @@
       margin-bottom: 8px;
     }
 
+    .status-items-preview {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
     .status-bill {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 800;
       color: #fbbf24;
       margin-bottom: 12px;
@@ -298,10 +305,11 @@
       background: var(--primary);
       border-color: var(--primary);
       color: #064e3b;
+      font-weight: 900;
       box-shadow: 0 4px 12px var(--primary-glow);
     }
 
-    /* Menu Grid Cards */
+    /* Menu Cards Grid */
     .menu-grid {
       display: flex;
       flex-direction: column;
@@ -317,181 +325,187 @@
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      transition: transform 0.15s ease, border-color 0.15s ease;
-    }
-
-    .menu-card:active {
-      transform: scale(0.99);
+      transition: transform 0.15s, border-color 0.15s;
     }
 
     .card-left {
       flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
     }
 
     .type-pill {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      font-size: 10.5px;
+      font-weight: 800;
+      margin-bottom: 4px;
     }
 
     .veg-dot {
-      width: 7px;
-      height: 7px;
+      width: 9px;
+      height: 9px;
+      border: 1.5px solid #22c55e;
       border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .veg-dot::after {
+      content: "";
+      width: 4px;
+      height: 4px;
       background: #22c55e;
-      display: inline-block;
+      border-radius: 50%;
     }
 
     .nonveg-dot {
-      width: 7px;
-      height: 7px;
+      width: 9px;
+      height: 9px;
+      border: 1.5px solid #ef4444;
       border-radius: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .nonveg-dot::after {
+      content: "";
+      width: 4px;
+      height: 4px;
       background: #ef4444;
-      display: inline-block;
+      border-radius: 50%;
     }
 
     .item-name {
       font-size: 15px;
       font-weight: 800;
-      color: var(--text);
-      line-height: 1.3;
+      color: #ffffff;
+      margin-bottom: 2px;
+      line-height: 1.25;
     }
 
-    .item-desc {
-      font-size: 12px;
+    .item-cat {
+      font-size: 11px;
       color: var(--text-dim);
-      line-height: 1.35;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      font-weight: 600;
+      margin-bottom: 4px;
     }
 
     .item-price {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 900;
-      color: #fbbf24;
-      margin-top: 4px;
-    }
-
-    .btn-add {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid var(--primary);
-      color: #34d399;
-      font-size: 13px;
-      font-weight: 800;
-      padding: 8px 18px;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .btn-add:hover {
-      background: var(--primary);
-      color: #064e3b;
+      color: var(--accent);
     }
 
     .stepper {
       display: flex;
       align-items: center;
-      background: #1f2937;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-      border-radius: 10px;
-      overflow: hidden;
+      gap: 8px;
+      background: #1e293b;
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid #334155;
     }
 
     .btn-step {
-      width: 34px;
-      height: 34px;
-      background: transparent;
-      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--card-bg);
+      border: 1px solid #475569;
       color: #ffffff;
       font-size: 16px;
-      font-weight: 800;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
     }
 
     .btn-step:active {
-      background: rgba(255, 255, 255, 0.1);
+      background: #334155;
     }
 
     .step-val {
-      min-width: 28px;
+      font-size: 13.5px;
+      font-weight: 800;
+      min-width: 18px;
       text-align: center;
-      font-size: 14px;
-      font-weight: 900;
-      color: #34d399;
     }
 
-    /* Sticky Bottom Floating Cart Bar */
+    .btn-add {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-add:active {
+      background: var(--primary);
+      color: #064e3b;
+    }
+
+    /* Floating Cart Bar */
     .cart-float {
       position: fixed;
-      bottom: calc(14px + var(--safe-bottom));
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 32px);
-      max-width: 680px;
-      background: linear-gradient(135deg, #059669 0%, #047857 100%);
-      box-shadow: 0 12px 30px rgba(5, 150, 105, 0.4);
-      border: 1px solid rgba(52, 211, 153, 0.4);
+      bottom: calc(16px + var(--safe-bottom));
+      left: 16px;
+      right: 16px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #ffffff;
+      padding: 14px 20px;
       border-radius: 18px;
-      padding: 12px 18px;
+      box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
       display: none;
       justify-content: space-between;
       align-items: center;
-      z-index: 40;
+      z-index: 50;
       cursor: pointer;
-      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: bounceIn 0.3s ease;
     }
 
     .cart-float.show {
       display: flex;
     }
 
-    @keyframes popIn {
-      from { transform: translate(-50%, 40px); opacity: 0; }
-      to { transform: translate(-50%, 0); opacity: 1; }
+    @keyframes bounceIn {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
 
     .cart-items-count {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 700;
-      color: #d1fae5;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: #a7f3d0;
     }
 
     .cart-total-val {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 900;
-      color: #ffffff;
     }
 
     .cart-action-btn {
       background: #ffffff;
-      color: #065f46;
-      border: none;
-      padding: 9px 18px;
+      color: #064e3b;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 900;
+      padding: 8px 16px;
       border-radius: 10px;
+      border: none;
     }
 
-    /* Cart & Customer Details Modal Sheet */
+    /* Checkout Modal */
     .modal-overlay {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(6px);
-      z-index: 50;
+      backdrop-filter: blur(8px);
+      z-index: 60;
       display: none;
-      justify-content: center;
       align-items: flex-end;
     }
 
@@ -500,15 +514,15 @@
     }
 
     .modal-content {
-      background: #111827;
-      border-top: 1.5px solid var(--surface-border);
-      width: 100%;
-      max-width: 600px;
-      max-height: 88vh;
+      background: var(--card-bg);
+      border-top: 1px solid var(--surface-border);
       border-radius: 24px 24px 0 0;
-      padding: 20px 20px calc(24px + var(--safe-bottom));
+      width: 100%;
+      max-height: 85vh;
       overflow-y: auto;
-      animation: slideUp 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+      padding: 20px 20px calc(24px + var(--safe-bottom));
+      box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+      animation: slideUp 0.25s ease-out;
     }
 
     @keyframes slideUp {
@@ -521,26 +535,24 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 16px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--surface-border);
     }
 
     .modal-head h3 {
       font-size: 17px;
       font-weight: 900;
-      color: #ffffff;
     }
 
     .btn-close {
       background: #1f2937;
-      border: none;
-      color: #cbd5e1;
+      border: 1px solid #374151;
+      color: var(--text-muted);
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      font-size: 16px;
-      font-weight: 800;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .form-group {
@@ -572,7 +584,7 @@
     }
 
     .order-list {
-      max-height: 200px;
+      max-height: 180px;
       overflow-y: auto;
       margin: 10px 0;
       padding-right: 4px;
@@ -629,24 +641,200 @@
       transform: scale(0.98);
     }
 
-    .btn-whatsapp-fallback {
-      margin-top: 10px;
+    /* Customer Official Bill View Container */
+    #customerBillContainer {
+      display: none;
+      margin: 8px 0 20px;
+    }
+
+    #customerBillContainer.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bill-paper {
+      background: #ffffff;
+      color: #0f172a;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+      border: 1px solid #e2e8f0;
+    }
+
+    .bill-header {
+      text-align: center;
+      border-bottom: 1.5px dashed #94a3b8;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+
+    .bill-store-name {
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      color: #0f172a;
+    }
+
+    .bill-subhead {
+      font-size: 12px;
+      color: #475569;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .bill-meta {
+      font-size: 12px;
+      color: #334155;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .bill-items-table {
       width: 100%;
-      background: #25D366;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+
+    .bill-items-table th {
+      border-bottom: 1px solid #cbd5e1;
+      padding: 6px 2px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .bill-items-table td {
+      padding: 7px 2px;
+      border-bottom: 1px dashed #e2e8f0;
+      color: #1e293b;
+    }
+
+    .bill-summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #475569;
+      padding: 3px 0;
+    }
+
+    .bill-grand-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 2px solid #0f172a;
+      border-bottom: 2px solid #0f172a;
+      padding: 10px 0;
+      margin: 10px 0;
+    }
+
+    .bill-grand-total .label {
+      font-size: 16px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .bill-grand-total .amount {
+      font-size: 24px;
+      font-weight: 900;
+      color: #059669;
+    }
+
+    /* Payment Modes Section */
+    .pay-modes-box {
+      margin-top: 14px;
+      border: 1.5px solid #059669;
+      background: #f0fdf4;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .pay-mode-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #065f46;
+      margin-bottom: 10px;
+    }
+
+    .qr-frame {
+      display: inline-block;
+      padding: 10px;
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      margin-bottom: 8px;
+    }
+
+    .qr-frame img {
+      width: 180px;
+      height: 180px;
+      display: block;
+    }
+
+    .upi-info {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+
+    .btn-pay-app {
+      display: inline-block;
+      background: #059669;
+      color: #ffffff;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 9px 18px;
+      border-radius: 8px;
+      margin-top: 4px;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
+    }
+
+    .btn-download-bill {
+      width: 100%;
+      margin-top: 14px;
+      background: #0f172a;
       color: #ffffff;
       border: none;
       padding: 12px;
-      font-size: 13px;
+      border-radius: 10px;
+      font-size: 13.5px;
       font-weight: 800;
-      border-radius: 12px;
       cursor: pointer;
-      display: none;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
     }
 
-    /* Greetings / Payment Settled Overlay */
+    .btn-confirm-paid {
+      width: 100%;
+      margin-top: 8px;
+      background: #059669;
+      color: #ffffff;
+      border: none;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 13.5px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* Greetings Celebration Overlay */
     .greetings-overlay {
       position: fixed;
       inset: 0;
@@ -698,7 +886,7 @@
       color: #34d399;
     }
 
-    .btn-done {
+    .btn-new-session {
       background: var(--primary);
       color: #064e3b;
       border: none;
@@ -720,30 +908,100 @@
       <div class="brand-subtitle"><span class="live-dot"></span> Live Table Ordering</div>
     </div>
     <div class="table-badge">
-      <span class="tbl-num" id="headerTableNum">TABLE T1</span>
+      <span class="tbl-num" id="headerTableNum">TABLE C-1</span>
       <span class="tbl-zone" id="headerTableZone">CLUB AREA</span>
     </div>
   </header>
 
   <div class="main-wrap">
-    <!-- Active Order Status Banner -->
+    <!-- Active Order Status Banner (Running Table Card) -->
     <div class="status-card" id="liveStatusBanner">
       <div class="status-card-header">
-        <span class="status-tbl" id="statusTableInfo">Table T1 • Running Order</span>
+        <span class="status-tbl" id="statusTableInfo">Table C-1 • Running Order</span>
         <span class="status-pill status-cooking" id="statusBadge">COOKING 👨‍🍳</span>
       </div>
       <div class="status-info" id="statusMessage">
         Order sent to the kitchen. Chef is freshly preparing your delicious food & drinks!
       </div>
+      <div class="status-items-preview" id="statusItemsPreview"></div>
       <div class="status-bill" id="statusBillAmount">Running Bill: ₹0.00</div>
       <button class="btn-checkout-req" id="btnRequestCheckout" onclick="handleRequestCheckout()">
         🔔 Checkout / Complete Order
       </button>
     </div>
 
+    <!-- Official Bill Container (Shown when POS cashier generates bill) -->
+    <div id="customerBillContainer">
+      <div class="bill-paper" id="printableBillArea">
+        <div class="bill-header">
+          <div class="bill-store-name">70MM LOUNGE</div>
+          <div class="bill-subhead">Restaurant • Bar • Club Lounge</div>
+          <div class="bill-subhead">Bokaro • Phone: 8987477773</div>
+        </div>
+
+        <div class="bill-meta">
+          <span>Table: <strong id="billTableNo">C-1</strong></span>
+          <span id="billDate">30 Sep 2026</span>
+        </div>
+        <div class="bill-meta">
+          <span>Guest: <strong id="billCustName">Guest</strong></span>
+          <span id="billCustPhone"></span>
+        </div>
+
+        <table class="bill-items-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th style="text-align: center;">Qty</th>
+              <th style="text-align: right;">Rate</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody id="billItemsTableBody"></tbody>
+        </table>
+
+        <div class="bill-summary-row">
+          <span>Subtotal:</span>
+          <span id="billSubtotal">₹0.00</span>
+        </div>
+        <div class="bill-summary-row">
+          <span>GST Tax:</span>
+          <span id="billTax">₹0.00</span>
+        </div>
+        <div class="bill-summary-row" id="billRoundOffRow">
+          <span>Round off:</span>
+          <span id="billRoundOff">₹0.00</span>
+        </div>
+
+        <div class="bill-grand-total">
+          <span class="label">TOTAL AMOUNT</span>
+          <span class="amount" id="billGrandTotal">₹0.00</span>
+        </div>
+
+        <!-- Payment Mode with Dynamic UPI QR -->
+        <div class="pay-modes-box">
+          <div class="pay-mode-title">💳 PAYMENT MODE: UPI / DIGITAL QR</div>
+          <div class="qr-frame">
+            <img id="upiQrImage" src="" alt="Scan UPI QR to Pay">
+          </div>
+          <div class="upi-info">UPI ID: <strong>8987477773@okbizaxis</strong></div>
+          <div class="upi-info" style="color: #059669; font-weight: 800;" id="qrAmountNotice">Exact Amount: ₹0.00</div>
+          <a href="#" class="btn-pay-app" id="btnDirectUpiPay">Pay via GPay / PhonePe / Paytm ⚡</a>
+        </div>
+
+        <button class="btn-download-bill" onclick="downloadBillHtml()">
+          📥 Download Bill (1-Click)
+        </button>
+
+        <button class="btn-confirm-paid" onclick="confirmPaymentFromCustomer()">
+          ✓ I Have Paid the Bill / Confirm Payment
+        </button>
+      </div>
+    </div>
+
     <!-- Search Box -->
     <div class="search-box">
-      <input type="text" class="search-input" id="dishSearch" placeholder="Search starters, main course, cocktails..." oninput="handleSearch()">
+      <input type="text" class="search-input" id="dishSearch" placeholder="Search starters, main course, mocktails..." oninput="handleSearch()">
     </div>
 
     <!-- Category Chips -->
@@ -796,10 +1054,6 @@
       <button class="btn-submit-order" id="btnPlaceOrder" onclick="submitOrderToKitchen()">
         Send Order to Kitchen 🚀
       </button>
-
-      <button class="btn-whatsapp-fallback" id="btnWhatsAppFallback" onclick="sendViaWhatsApp()">
-        📲 Send Order via WhatsApp (Direct to Manager)
-      </button>
     </div>
   </div>
 
@@ -809,7 +1063,7 @@
     <h2 style="font-size: 24px; font-weight: 900; color: #ffffff;">Thank You for Dining!</h2>
     <p style="font-size: 15px; color: #34d399; font-weight: 800; margin-top: 4px;" id="greetingsTable">Table Bill Settled Successfully</p>
     <p style="font-size: 13px; color: #94a3b8; margin-top: 6px; max-width: 320px;">
-      Your payment was processed at POS. We hope you had a fabulous time at 70MM Lounge!
+      Your payment was received. We hope you had a fabulous time at 70MM Lounge!
     </p>
     
     <div class="stars" id="starRating">★★★★★</div>
@@ -820,56 +1074,266 @@
       <div class="feedback-chip" onclick="this.classList.toggle('selected')">Fast Service ⚡</div>
     </div>
     
-    <button class="btn-done" onclick="location.reload()">Start New Session</button>
+    <button class="btn-new-session" onclick="startNewSession()">Start New Session</button>
   </div>
 
   <script>
-    // 1. Read URL Parameters
+    // 1. Read URL Parameters & LocalStorage Persistence
     const urlParams = new URLSearchParams(window.location.search);
-    const tableNumber = urlParams.get('table') || 'T1';
-    const zone = decodeURIComponent(urlParams.get('zone') || 'Club Area');
-    const posHost = urlParams.get('host') || ''; // e.g. 192.168.1.15:8080
+    const tableNumber = (urlParams.get('table') || localStorage.getItem('70mm_table') || 'C-1').trim().toUpperCase();
+    const zone = decodeURIComponent(urlParams.get('zone') || localStorage.getItem('70mm_zone') || 'Club area');
+    const posHost = urlParams.get('host') || localStorage.getItem('70mm_pos_host') || '';
+    const CLOUD_ORDERS_TOPIC = "lounge70mm_bokaro_orders";
+    const CLOUD_BILL_TOPIC = "lounge70mm_table_" + tableNumber.toLowerCase() + "_bill";
 
-    document.getElementById('headerTableNum').innerText = 'TABLE ' + tableNumber.toUpperCase();
+    localStorage.setItem('70mm_table', tableNumber);
+    localStorage.setItem('70mm_zone', zone);
+    if (posHost) localStorage.setItem('70mm_pos_host', posHost);
+
+    document.getElementById('headerTableNum').innerText = 'TABLE ' + tableNumber;
     document.getElementById('headerTableZone').innerText = zone.toUpperCase();
     document.getElementById('modalTableTitle').innerText = 'Table ' + tableNumber + ' Order';
 
-    // 2. Default Full 70MM Lounge Products Catalog
-    const defaultProducts = [
-      { id: 1, name: "Crispy Corn Salt & Pepper", category: "Starters", price: 220, isVeg: true, desc: "Golden fried sweet corn tossed with aromatic peppers and spring onions." },
-      { id: 2, name: "Paneer Tikka Angara", category: "Starters", price: 290, isVeg: true, desc: "Smoky tandoori cottage cheese cubes in fiery spices." },
-      { id: 3, name: "Chicken Wings BBQ (6 pcs)", category: "Starters", price: 340, isVeg: false, desc: "Juicy glazed chicken wings in rich smoky barbecue sauce." },
-      { id: 4, name: "Chilli Chicken Dry", category: "Starters", price: 320, isVeg: false, desc: "Crispy chicken tossed with bell peppers, green chillies & dark soy." },
-      { id: 5, name: "Loaded Cheese Nachos Deluxe", category: "Starters", price: 260, isVeg: true, desc: "Tortilla chips smothered in melted cheese and jalapenos." },
-      { id: 6, name: "Fish Amritsari Tikka", category: "Starters", price: 420, isVeg: false, desc: "Fresh fish fillets seasoned with carom seeds and crisp batter fried." },
-      
-      { id: 10, name: "Dal Makhani 70MM Special", category: "Main Course", price: 280, isVeg: true, desc: "Slow-cooked black lentils simmered with rich butter & cream." },
-      { id: 11, name: "Paneer Butter Masala", category: "Main Course", price: 310, isVeg: true, desc: "Soft cottage cheese in rich tomato and cashew gravy." },
-      { id: 12, name: "Butter Chicken Boneless", category: "Main Course", price: 390, isVeg: false, desc: "Tandoori chicken cooked in rich velvety makhani gravy." },
-      { id: 13, name: "Chicken Biryani with Raita", category: "Main Course", price: 360, isVeg: false, desc: "Aromatic basmati rice cooked with chicken and saffron." },
-      { id: 14, name: "Veg Dum Biryani", category: "Main Course", price: 280, isVeg: true, desc: "Layered basmati rice with exotic fresh vegetables." },
-      { id: 15, name: "Butter Naan (2 pcs)", category: "Main Course", price: 80, isVeg: true, desc: "Tandoor-baked leavened bread brushed with rich butter." },
-      
-      { id: 20, name: "Classic Mint Mojito", category: "Drinks & Cocktails", price: 240, isVeg: true, desc: "Refreshing blend of fresh mint, lime wedges, sugar syrup and fizz." },
-      { id: 21, name: "Long Island Iced Tea (LIIT)", category: "Drinks & Cocktails", price: 490, isVeg: true, desc: "High-octane mix of white spirits with lemon juice and splash of cola." },
-      { id: 22, name: "Blue Lagoon Mocktail", category: "Drinks & Cocktails", price: 190, isVeg: true, desc: "Electric blue citrus blend topped with sprite and lemon." },
-      { id: 24, name: "Corona Extra Beer (330ml)", category: "Drinks & Cocktails", price: 320, isVeg: true, desc: "Crisp imported Mexican lager served chilled." },
-      
-      { id: 30, name: "Royal Paan Special Hookah", category: "Lounge Specials", price: 750, isVeg: true, desc: "Signature sweet betel leaf blend with ice chilling base." },
-      { id: 31, name: "Mint Blast Ice Shisha", category: "Lounge Specials", price: 700, isVeg: true, desc: "Super refreshing frozen spearmint smoke with ice pipe." },
-      
-      { id: 40, name: "Hot Gulab Jamun with Ice Cream", category: "Desserts", price: 150, isVeg: true, desc: "Soft warm khoya dumplings served with cold vanilla scoop." },
-      { id: 41, name: "Sizzling Chocolate Brownie", category: "Desserts", price: 220, isVeg: true, desc: "Decadent brownie served on hot sizzler plate with chocolate drizzle." }
+    // 2. Full Official Catalog of All ~100 Dishes from POS Menu
+    const allRestaurantProducts = [
+      // 1. SOUPS
+      { id: 1, name: "Cream Of Tomato", category: "Soups", price: 110, isVeg: true },
+      { id: 2, name: "Veg Manchow", category: "Soups", price: 140, isVeg: true },
+      { id: 3, name: "Veg Sweet Corn", category: "Soups", price: 140, isVeg: true },
+      { id: 4, name: "Chicken Hot & Sour", category: "Soups", price: 160, isVeg: false },
+      { id: 5, name: "Chicken Manchow", category: "Soups", price: 160, isVeg: false },
+      { id: 6, name: "Chicken Clear Soup", category: "Soups", price: 120, isVeg: false },
+
+      // 2. APPETIZERS & CHAAP
+      { id: 10, name: "Paneer Pakoda", category: "Appetizers & Chaap", price: 200, isVeg: true },
+      { id: 11, name: "Onion Chhita Pakoda", category: "Appetizers & Chaap", price: 160, isVeg: true },
+      { id: 12, name: "Chicken Pakoda", category: "Appetizers & Chaap", price: 250, isVeg: false },
+      { id: 13, name: "Peanut Masala", category: "Appetizers & Chaap", price: 100, isVeg: true },
+      { id: 14, name: "Cheese Balls", category: "Appetizers & Chaap", price: 240, isVeg: true },
+      { id: 15, name: "French Fries", category: "Appetizers & Chaap", price: 140, isVeg: true },
+      { id: 16, name: "French Fries Peri-Peri", category: "Appetizers & Chaap", price: 160, isVeg: true },
+      { id: 17, name: "Cheese Naan Bomb", category: "Appetizers & Chaap", price: 280, isVeg: true },
+      { id: 18, name: "Malai Chaap", category: "Appetizers & Chaap", price: 180, isVeg: true },
+      { id: 19, name: "Achari Chaap", category: "Appetizers & Chaap", price: 190, isVeg: true },
+      { id: 20, name: "Afghani Chaap", category: "Appetizers & Chaap", price: 190, isVeg: true },
+      { id: 21, name: "Chatpata Chaap", category: "Appetizers & Chaap", price: 180, isVeg: true },
+      { id: 22, name: "Punjabi Chaap", category: "Appetizers & Chaap", price: 180, isVeg: true },
+
+      // 3. TANDOOR & KEBABS
+      { id: 30, name: "Paneer Tikka", category: "Tandoor & Kebabs", price: 250, isVeg: true },
+      { id: 31, name: "Paneer Achari Tikka", category: "Tandoor & Kebabs", price: 260, isVeg: true },
+      { id: 32, name: "Paneer Afghani Tikka", category: "Tandoor & Kebabs", price: 280, isVeg: true },
+      { id: 33, name: "Paneer Malai Tikka", category: "Tandoor & Kebabs", price: 280, isVeg: true },
+      { id: 34, name: "Chicken Tikka", category: "Tandoor & Kebabs", price: 280, isVeg: false },
+      { id: 35, name: "Chicken Achari Tikka", category: "Tandoor & Kebabs", price: 290, isVeg: false },
+      { id: 36, name: "Chicken Afghani Tikka", category: "Tandoor & Kebabs", price: 290, isVeg: false },
+      { id: 37, name: "Chicken Malai Tikka", category: "Tandoor & Kebabs", price: 290, isVeg: false },
+      { id: 38, name: "Tandoori Veg Platter", category: "Tandoor & Kebabs", price: 400, isVeg: true },
+      { id: 39, name: "Tandoori Chicken Full", category: "Tandoor & Kebabs", price: 540, isVeg: false },
+      { id: 40, name: "Tandoori Chicken Half", category: "Tandoor & Kebabs", price: 280, isVeg: false },
+      { id: 41, name: "Tandoori Prawn", category: "Tandoor & Kebabs", price: 440, isVeg: false },
+      { id: 42, name: "Fish Tikka", category: "Tandoor & Kebabs", price: 320, isVeg: false },
+      { id: 43, name: "Fish Achari Tikka", category: "Tandoor & Kebabs", price: 340, isVeg: false },
+      { id: 44, name: "Harabhara Kebab", category: "Tandoor & Kebabs", price: 240, isVeg: true },
+      { id: 45, name: "Veg Shami Kebab", category: "Tandoor & Kebabs", price: 260, isVeg: true },
+      { id: 46, name: "Veg Seekh Kebab", category: "Tandoor & Kebabs", price: 250, isVeg: true },
+      { id: 47, name: "Paneer Seekh Kebab", category: "Tandoor & Kebabs", price: 280, isVeg: true },
+      { id: 48, name: "Chicken Seekh Kebab", category: "Tandoor & Kebabs", price: 300, isVeg: false },
+      { id: 49, name: "Chicken Haryali Kebab", category: "Tandoor & Kebabs", price: 280, isVeg: false },
+      { id: 50, name: "Chicken Boti Kebab", category: "Tandoor & Kebabs", price: 290, isVeg: false },
+      { id: 51, name: "Chicken Afghani Kebab", category: "Tandoor & Kebabs", price: 300, isVeg: false },
+      { id: 52, name: "Tangri Kebab (4 piece)", category: "Tandoor & Kebabs", price: 380, isVeg: false },
+      { id: 53, name: "Chicken Banjara Kebab", category: "Tandoor & Kebabs", price: 290, isVeg: false },
+      { id: 54, name: "Fish Fingers", category: "Tandoor & Kebabs", price: 320, isVeg: false },
+
+      // 4. CHINESE
+      { id: 60, name: "Paneer Chilli Dry", category: "Chinese", price: 240, isVeg: true },
+      { id: 61, name: "Paneer Chilli Gravy", category: "Chinese", price: 260, isVeg: true },
+      { id: 62, name: "Paneer Honey Chilli", category: "Chinese", price: 280, isVeg: true },
+      { id: 63, name: "Paneer 65", category: "Chinese", price: 250, isVeg: true },
+      { id: 64, name: "Paneer Salt & Pepper", category: "Chinese", price: 250, isVeg: true },
+      { id: 65, name: "Paneer Fried Rice", category: "Chinese", price: 180, isVeg: true },
+      { id: 66, name: "Veg Fried Rice", category: "Chinese", price: 160, isVeg: true },
+      { id: 67, name: "Schezwan Fried Rice", category: "Chinese", price: 170, isVeg: true },
+      { id: 68, name: "Chilli Garlic Fried Rice", category: "Chinese", price: 180, isVeg: true },
+      { id: 69, name: "Mix Fried Rice", category: "Chinese", price: 190, isVeg: true },
+      { id: 70, name: "Baby Corn Crispy", category: "Chinese", price: 250, isVeg: true },
+      { id: 71, name: "Baby Corn Chilli Dry", category: "Chinese", price: 240, isVeg: true },
+      { id: 72, name: "Baby Corn Chilli Gravy", category: "Chinese", price: 260, isVeg: true },
+      { id: 73, name: "Mushroom Chilli Dry", category: "Chinese", price: 250, isVeg: true },
+      { id: 74, name: "Mushroom Chilli Gravy", category: "Chinese", price: 260, isVeg: true },
+      { id: 75, name: "Mushroom Honey Chilli", category: "Chinese", price: 290, isVeg: true },
+      { id: 76, name: "Mushroom Salt & Pepper", category: "Chinese", price: 250, isVeg: true },
+      { id: 77, name: "Szechwan Paneer", category: "Chinese", price: 240, isVeg: true },
+      { id: 78, name: "Veg Manchurian Dry", category: "Chinese", price: 240, isVeg: true },
+      { id: 79, name: "Veg Manchurian Gravy", category: "Chinese", price: 250, isVeg: true },
+      { id: 80, name: "Corn Salt & Pepper", category: "Chinese", price: 230, isVeg: true },
+      { id: 81, name: "Veg Lollipop", category: "Chinese", price: 200, isVeg: true },
+      { id: 82, name: "Honey Chilli Potato", category: "Chinese", price: 210, isVeg: true },
+      { id: 83, name: "Veg Spring Roll", category: "Chinese", price: 180, isVeg: true },
+      { id: 84, name: "Chicken Chilli Dry", category: "Chinese", price: 260, isVeg: false },
+      { id: 85, name: "Chicken Chilli B/L", category: "Chinese", price: 280, isVeg: false },
+      { id: 86, name: "Chicken 65", category: "Chinese", price: 280, isVeg: false },
+      { id: 87, name: "Chicken Salt & Pepper", category: "Chinese", price: 290, isVeg: false },
+      { id: 88, name: "Chicken Hot Garlic", category: "Chinese", price: 290, isVeg: false },
+      { id: 89, name: "Chicken Honey Chilli", category: "Chinese", price: 300, isVeg: false },
+      { id: 90, name: "Chicken Lollipop", category: "Chinese", price: 300, isVeg: false },
+      { id: 91, name: "Chicken Fried Rice", category: "Chinese", price: 180, isVeg: false },
+      { id: 92, name: "Lemon Chicken", category: "Chinese", price: 290, isVeg: false },
+      { id: 93, name: "Szechwan Chicken", category: "Chinese", price: 300, isVeg: false },
+      { id: 94, name: "Chicken Spring Roll", category: "Chinese", price: 200, isVeg: false },
+      { id: 95, name: "Chicken Schezwan Fried Rice", category: "Chinese", price: 190, isVeg: false },
+      { id: 96, name: "Chicken Chilli Garlic Fried Rice", category: "Chinese", price: 200, isVeg: false },
+      { id: 97, name: "Chicken Mix Fried Rice", category: "Chinese", price: 210, isVeg: false },
+
+      // 5. NOODLES
+      { id: 100, name: "Veg Hakka Noodle", category: "Noodles", price: 160, isVeg: true },
+      { id: 101, name: "Paneer Hakka Noodle", category: "Noodles", price: 200, isVeg: true },
+      { id: 102, name: "Baby Corn Hakka Noodle", category: "Noodles", price: 220, isVeg: true },
+      { id: 103, name: "Mix Hakka Noodle", category: "Noodles", price: 210, isVeg: true },
+      { id: 104, name: "Mushroom Hakka Noodle", category: "Noodles", price: 220, isVeg: true },
+      { id: 105, name: "Veg Szechwan Hakka Noodle", category: "Noodles", price: 200, isVeg: true },
+      { id: 106, name: "Veg American Chopsuey", category: "Noodles", price: 200, isVeg: true },
+      { id: 107, name: "Chilli Garlic Hakka Noodle", category: "Noodles", price: 220, isVeg: true },
+      { id: 108, name: "Chicken Hakka Noodle", category: "Noodles", price: 260, isVeg: false },
+      { id: 109, name: "Mix Hakka Noodle Non-Veg", category: "Noodles", price: 270, isVeg: false },
+
+      // 6. MAIN COURSE (VEG & DAL)
+      { id: 120, name: "Paneer Butter Masala", category: "Main Course (Veg & Dal)", price: 270, isVeg: true },
+      { id: 121, name: "Paneer Do Pyaza", category: "Main Course (Veg & Dal)", price: 280, isVeg: true },
+      { id: 122, name: "Paneer Kadhai", category: "Main Course (Veg & Dal)", price: 280, isVeg: true },
+      { id: 123, name: "Paneer Handi", category: "Main Course (Veg & Dal)", price: 250, isVeg: true },
+      { id: 124, name: "Paneer Tikka Butter Masala", category: "Main Course (Veg & Dal)", price: 260, isVeg: true },
+      { id: 125, name: "Paneer Afghani Tikka Masala", category: "Main Course (Veg & Dal)", price: 230, isVeg: true },
+      { id: 126, name: "Sahi Paneer", category: "Main Course (Veg & Dal)", price: 200, isVeg: true },
+      { id: 127, name: "Palak Paneer", category: "Main Course (Veg & Dal)", price: 210, isVeg: true },
+      { id: 128, name: "Matar Paneer", category: "Main Course (Veg & Dal)", price: 250, isVeg: true },
+      { id: 129, name: "Malai Kofta", category: "Main Course (Veg & Dal)", price: 290, isVeg: true },
+      { id: 130, name: "Veg Kofta", category: "Main Course (Veg & Dal)", price: 280, isVeg: true },
+      { id: 131, name: "Mix Veg", category: "Main Course (Veg & Dal)", price: 250, isVeg: true },
+      { id: 132, name: "Mushroom Masala", category: "Main Course (Veg & Dal)", price: 240, isVeg: true },
+      { id: 133, name: "Mushroom Paneer Masala", category: "Main Course (Veg & Dal)", price: 240, isVeg: true },
+      { id: 134, name: "Mushroom Butter Masala", category: "Main Course (Veg & Dal)", price: 240, isVeg: true },
+      { id: 135, name: "Mushroom Do Pyaza", category: "Main Course (Veg & Dal)", price: 240, isVeg: true },
+      { id: 136, name: "Mushroom Irani", category: "Main Course (Veg & Dal)", price: 240, isVeg: true },
+      { id: 137, name: "Dal Fry", category: "Main Course (Veg & Dal)", price: 130, isVeg: true },
+      { id: 138, name: "Dal Tadka", category: "Main Course (Veg & Dal)", price: 150, isVeg: true },
+      { id: 139, name: "Dal Makhani", category: "Main Course (Veg & Dal)", price: 200, isVeg: true },
+      { id: 140, name: "Dal Panchratan", category: "Main Course (Veg & Dal)", price: 170, isVeg: true },
+
+      // 7. MAIN COURSE (NON-VEG)
+      { id: 150, name: "Egg Masala", category: "Main Course (Non-Veg)", price: 240, isVeg: false },
+      { id: 151, name: "Chicken Do Payaza (4pc)", category: "Main Course (Non-Veg)", price: 340, isVeg: false },
+      { id: 152, name: "Chicken Butter Masala (4pc)", category: "Main Course (Non-Veg)", price: 360, isVeg: false },
+      { id: 153, name: "Chicken Kadhai (4pc)", category: "Main Course (Non-Veg)", price: 340, isVeg: false },
+      { id: 154, name: "Chicken Irani (4pc)", category: "Main Course (Non-Veg)", price: 340, isVeg: false },
+      { id: 155, name: "Chicken Korma", category: "Main Course (Non-Veg)", price: 360, isVeg: false },
+      { id: 156, name: "Chicken Masala (4pc)", category: "Main Course (Non-Veg)", price: 340, isVeg: false },
+      { id: 157, name: "Chicken Tikka Masala", category: "Main Course (Non-Veg)", price: 280, isVeg: false },
+      { id: 158, name: "Chicken Afghani Tikka Masala", category: "Main Course (Non-Veg)", price: 380, isVeg: false },
+      { id: 159, name: "Desi Chicken", category: "Main Course (Non-Veg)", price: 1000, isVeg: false },
+      { id: 160, name: "Murg Mussalam (8pc)", category: "Main Course (Non-Veg)", price: 800, isVeg: false },
+      { id: 161, name: "Chicken Kassa (4pc)", category: "Main Course (Non-Veg)", price: 380, isVeg: false },
+      { id: 162, name: "Chicken Dehati [8pc / Full]", category: "Main Course (Non-Veg)", price: 800, isVeg: false },
+      { id: 163, name: "Chicken Dehati [Half]", category: "Main Course (Non-Veg)", price: 250, isVeg: false },
+      { id: 164, name: "Chicken Handi [8pc / Full]", category: "Main Course (Non-Veg)", price: 800, isVeg: false },
+      { id: 165, name: "Chicken Handi [Half]", category: "Main Course (Non-Veg)", price: 230, isVeg: false },
+
+      // 8. RICE & BIRYANI
+      { id: 170, name: "Plain Rice", category: "Rice & Biryani", price: 100, isVeg: true },
+      { id: 171, name: "Jeera Rice", category: "Rice & Biryani", price: 130, isVeg: true },
+      { id: 172, name: "Veg Pulao", category: "Rice & Biryani", price: 150, isVeg: true },
+      { id: 173, name: "Paneer Pulao", category: "Rice & Biryani", price: 170, isVeg: true },
+      { id: 174, name: "Peas Pulao", category: "Rice & Biryani", price: 140, isVeg: true },
+      { id: 175, name: "Kashmiri Pulao", category: "Rice & Biryani", price: 200, isVeg: true },
+      { id: 176, name: "Veg Biryani", category: "Rice & Biryani", price: 180, isVeg: true },
+      { id: 177, name: "Chicken Biryani", category: "Rice & Biryani", price: 240, isVeg: false },
+      { id: 178, name: "Hyderabadi Chicken Biryani", category: "Rice & Biryani", price: 250, isVeg: false },
+
+      // 9. INDIAN BREAD
+      { id: 190, name: "Tandoori Roti", category: "Indian Bread", price: 20, isVeg: true },
+      { id: 191, name: "Tandoori Butter Roti", category: "Indian Bread", price: 25, isVeg: true },
+      { id: 192, name: "Naan", category: "Indian Bread", price: 35, isVeg: true },
+      { id: 193, name: "Butter Naan", category: "Indian Bread", price: 40, isVeg: true },
+      { id: 194, name: "Garlic Naan", category: "Indian Bread", price: 60, isVeg: true },
+      { id: 195, name: "Cheese Naan", category: "Indian Bread", price: 90, isVeg: true },
+      { id: 196, name: "Plain Kulcha", category: "Indian Bread", price: 50, isVeg: true },
+      { id: 197, name: "Masala Kulcha", category: "Indian Bread", price: 60, isVeg: true },
+      { id: 198, name: "Paneer Kulcha", category: "Indian Bread", price: 80, isVeg: true },
+      { id: 199, name: "Amritsar Kulcha", category: "Indian Bread", price: 90, isVeg: true },
+
+      // 10. PAPAD, SALAD & RAITA
+      { id: 210, name: "Dry Papad", category: "Papad, Salad & Raita", price: 20, isVeg: true },
+      { id: 211, name: "Fry Papad", category: "Papad, Salad & Raita", price: 30, isVeg: true },
+      { id: 212, name: "Masala Papad", category: "Papad, Salad & Raita", price: 80, isVeg: true },
+      { id: 213, name: "Green Salad", category: "Papad, Salad & Raita", price: 100, isVeg: true },
+      { id: 214, name: "Onion Salad", category: "Papad, Salad & Raita", price: 80, isVeg: true },
+      { id: 215, name: "Fruit Salad", category: "Papad, Salad & Raita", price: 180, isVeg: true },
+      { id: 216, name: "Veg Raita", category: "Papad, Salad & Raita", price: 90, isVeg: true },
+      { id: 217, name: "Onion Raita", category: "Papad, Salad & Raita", price: 90, isVeg: true },
+      { id: 218, name: "Boondi Raita", category: "Papad, Salad & Raita", price: 90, isVeg: true },
+      { id: 219, name: "Pineapple Raita", category: "Papad, Salad & Raita", price: 120, isVeg: true },
+
+      // 11. SPECIAL MOCKTAILS
+      { id: 230, name: "Virgin Mojito", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 231, name: "Virgin Kiwi Cooler", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 232, name: "Mumbai Maharani", category: "Special Mocktails", price: 150, isVeg: true },
+      { id: 233, name: "Indian Summer", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 234, name: "Adam Eve", category: "Special Mocktails", price: 160, isVeg: true },
+      { id: 235, name: "Patyala the Maharaja", category: "Special Mocktails", price: 165, isVeg: true },
+      { id: 236, name: "Sweet Sixteen", category: "Special Mocktails", price: 165, isVeg: true },
+      { id: 237, name: "Apple Eye", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 238, name: "Fruit Punch", category: "Special Mocktails", price: 150, isVeg: true },
+      { id: 239, name: "Mango Boom", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 240, name: "Cinderella", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 241, name: "Virgin Pinacolada", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 242, name: "Lipstick on the Collar", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 243, name: "First Impression", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 244, name: "Vanilla Ice Cream with Orange Syrup", category: "Special Mocktails", price: 170, isVeg: true },
+      { id: 245, name: "Shirley Temple", category: "Special Mocktails", price: 170, isVeg: true },
+
+      // 12. BEVERAGES & SHAKES
+      { id: 260, name: "Coffee", category: "Beverages & Shakes", price: 140, isVeg: true },
+      { id: 261, name: "Cold Coffee", category: "Beverages & Shakes", price: 160, isVeg: true },
+      { id: 262, name: "Coffee with Ice-Cream", category: "Beverages & Shakes", price: 180, isVeg: true },
+      { id: 263, name: "Masala Cold Drink", category: "Beverages & Shakes", price: 120, isVeg: true },
+      { id: 264, name: "Redbull", category: "Beverages & Shakes", price: 200, isVeg: true },
+      { id: 265, name: "Monster", category: "Beverages & Shakes", price: 200, isVeg: true },
+      { id: 266, name: "Can Cold Drink", category: "Beverages & Shakes", price: 110, isVeg: true },
+      { id: 267, name: "Soda (750ml)", category: "Beverages & Shakes", price: 80, isVeg: true },
+      { id: 268, name: "Vanilla Shake", category: "Beverages & Shakes", price: 140, isVeg: true },
+      { id: 269, name: "Mango Shake", category: "Beverages & Shakes", price: 160, isVeg: true },
+      { id: 270, name: "Kesar Pista Shake", category: "Beverages & Shakes", price: 180, isVeg: true },
+      { id: 271, name: "Oreo Shake", category: "Beverages & Shakes", price: 180, isVeg: true },
+      { id: 272, name: "Brownie Shake", category: "Beverages & Shakes", price: 200, isVeg: true },
+      { id: 273, name: "Kitkat Shake", category: "Beverages & Shakes", price: 180, isVeg: true },
+      { id: 274, name: "Chocolate Shake", category: "Beverages & Shakes", price: 180, isVeg: true },
+
+      // 13. DESSERTS
+      { id: 290, name: "Gulab Jamun (2 pcs)", category: "Desserts", price: 80, isVeg: true },
+      { id: 291, name: "Ice-Cream", category: "Desserts", price: 100, isVeg: true },
+      { id: 292, name: "Ice-Cream with Gulab Jamun", category: "Desserts", price: 160, isVeg: true }
     ];
 
-    let products = [...defaultProducts];
+    let products = [...allRestaurantProducts];
     let cart = {};
     let activeCategory = 'All';
-    let hasPlacedOrder = false;
     let pollInterval = null;
+    let sseSource = null;
+    let currentActiveBill = null;
 
-    // 3. Initialize & Fetch Live Menu from POS Local Server
+    // 3. Page Initialization & State Restoration (Refreshes will NEVER clear active table!)
     async function init() {
+      // Restore cached form data
+      const savedName = localStorage.getItem('70mm_cust_name');
+      const savedPhone = localStorage.getItem('70mm_cust_phone');
+      if (savedName) document.getElementById('custName').value = savedName;
+      if (savedPhone) document.getElementById('custPhone').value = savedPhone;
+
+      // Restore active running order state if exists in localStorage
+      restoreActiveOrderFromStorage();
+
+      // Try fetching live menu from POS local server if available
       if (posHost) {
         try {
           const res = await fetch('http://' + posHost + '/api/menu', { cache: 'no-store' });
@@ -877,20 +1341,61 @@
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) products = data;
           }
-        } catch (_e) {
-          console.log("POS local fetch bypassed; using built-in catalog.");
-        }
+        } catch (_e) {}
       }
+
       renderCategoryChips();
       renderMenu();
-      startStatusPolling();
+      startRealtimeListeners();
+    }
+
+    function restoreActiveOrderFromStorage() {
+      const activeState = localStorage.getItem('70mm_active_order_' + tableNumber);
+      if (activeState) {
+        try {
+          const parsed = JSON.parse(activeState);
+          if (parsed && parsed.active) {
+            showActiveRunningOrderCard(parsed.guestName, parsed.guestPhone, parsed.itemsSummary, parsed.billAmount, parsed.checkoutRequested);
+          }
+        } catch (_e) {}
+      }
+
+      // Check if bill was already received
+      const savedBill = localStorage.getItem('70mm_active_bill_' + tableNumber);
+      if (savedBill) {
+        try {
+          const billObj = JSON.parse(savedBill);
+          if (billObj && billObj.grandTotal > 0) {
+            displayCustomerBill(billObj);
+          }
+        } catch (_e) {}
+      }
+    }
+
+    function showActiveRunningOrderCard(name, phone, itemsSummary, billAmount, isCheckoutRequested) {
+      const banner = document.getElementById('liveStatusBanner');
+      banner.classList.add('active');
+      document.getElementById('statusTableInfo').innerText = 'Table ' + tableNumber + ' • Running Order';
+      document.getElementById('statusMessage').innerText = 'Order active for ' + name + (phone ? ' (' + phone + ')' : '') + '. Your delicious food & drinks are being prepared!';
+      if (itemsSummary) {
+        document.getElementById('statusItemsPreview').innerText = 'Ordered: ' + itemsSummary;
+        document.getElementById('statusItemsPreview').style.display = 'block';
+      }
+      if (billAmount > 0) {
+        document.getElementById('statusBillAmount').innerText = 'Running Bill: ₹' + parseFloat(billAmount).toFixed(2);
+      }
+      const checkoutBtn = document.getElementById('btnRequestCheckout');
+      if (isCheckoutRequested) {
+        checkoutBtn.className = 'btn-checkout-req requested';
+        checkoutBtn.innerText = '🔔 Checkout Requested ⏳ Cashier Notified';
+      }
     }
 
     function renderCategoryChips() {
       const cats = ['All', ...new Set(products.map(p => p.category))];
       const container = document.getElementById('catChipsContainer');
       container.innerHTML = cats.map(c => 
-        '<div class="cat-chip ' + (c === activeCategory ? 'active' : '') + '" onclick="selectCategory(\'' + c + '\')">' + c + '</div>'
+        '<div class="cat-chip ' + (c === activeCategory ? 'active' : '') + '" onclick="selectCategory(\'' + c.replace(/'/g, "\\'") + '\')">' + c + '</div>'
       ).join('');
     }
 
@@ -936,7 +1441,7 @@
           '<div class="card-left">' +
             typeBadge +
             '<div class="item-name">' + p.name + '</div>' +
-            '<div class="item-desc">' + (p.desc || p.category) + '</div>' +
+            '<div class="item-cat">' + p.category + '</div>' +
             '<div class="item-price">₹' + p.price.toFixed(2) + '</div>' +
           '</div>' +
           '<div>' + actionHtml + '</div>' +
@@ -997,7 +1502,7 @@
       document.getElementById('checkoutModal').classList.remove('open');
     }
 
-    // 4. Order Transmission to POS & KOT
+    // 4. Order Transmission (Both Local Wi-Fi & Cloud Relay for 4G/5G non-Wi-Fi users!)
     async function submitOrderToKitchen() {
       const name = document.getElementById('custName').value.trim();
       const phone = document.getElementById('custPhone').value.trim();
@@ -1022,134 +1527,319 @@
       btn.disabled = true;
       btn.innerText = "Transmitting to Kitchen...";
 
-      let directSuccess = false;
+      // Save user details for session
+      localStorage.setItem('70mm_cust_name', name);
+      localStorage.setItem('70mm_cust_phone', phone);
+
+      const orderPayload = {
+        type: 'NEW_ORDER',
+        tableNumber: tableNumber,
+        zone: zone,
+        customerName: name,
+        customerPhone: phone,
+        notes: notes,
+        items: items,
+        timestamp: Date.now()
+      };
+
+      // 1. Post to local POS server (if on same Wi-Fi)
       if (posHost) {
         try {
-          const res = await fetch('http://' + posHost + '/api/order', {
+          fetch('http://' + posHost + '/api/order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tableNumber: tableNumber,
-              zone: zone,
-              customerName: name,
-              customerPhone: phone,
-              notes: notes,
-              items: items
-            })
-          });
-          const data = await res.json();
-          if (data && data.success) directSuccess = true;
-        } catch (_e) {
-          console.log("Direct POS POST unreachable from remote origin.");
-        }
+            body: JSON.stringify(orderPayload)
+          }).catch(() => {});
+        } catch (_e) {}
       }
 
-      hasPlacedOrder = true;
+      // 2. Post to Cloud Relay (works seamlessly even when NOT on same Wi-Fi, over cellular 4G/5G!)
+      try {
+        await fetch('https://ntfy.sh/' + CLOUD_ORDERS_TOPIC, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderPayload)
+        });
+      } catch (_e) {}
+
+      // Calculate added bill
+      const newItemsTotal = items.reduce((s, it) => s + (it.price * it.quantity), 0);
+      const existingState = JSON.parse(localStorage.getItem('70mm_active_order_' + tableNumber) || '{}');
+      const priorBill = existingState.billAmount || 0;
+      const combinedBill = priorBill + newItemsTotal;
+
+      const itemsSummary = items.map(it => it.quantity + 'x ' + it.name).join(' ; ');
+      const priorSummary = existingState.itemsSummary || '';
+      const combinedSummary = priorSummary ? priorSummary + ' ; ' + itemsSummary : itemsSummary;
+
+      // Save running order state to localStorage so refresh never wipes it!
+      const activeState = {
+        active: true,
+        guestName: name,
+        guestPhone: phone,
+        itemsSummary: combinedSummary,
+        billAmount: combinedBill,
+        checkoutRequested: false,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('70mm_active_order_' + tableNumber, JSON.stringify(activeState));
+
       cart = {};
       closeCartModal();
       renderMenu();
 
-      // Show real-time active status banner
-      const banner = document.getElementById('liveStatusBanner');
-      banner.classList.add('active');
-      document.getElementById('statusBadge').className = 'status-pill status-cooking';
-      document.getElementById('statusBadge').innerText = 'COOKING 👨‍🍳';
-      document.getElementById('statusMessage').innerText = 'Order placed for ' + name + ' (' + phone + '). Your food is freshly being prepared in kitchen!';
-
-      if (!directSuccess) {
-        document.getElementById('btnWhatsAppFallback').style.display = 'flex';
-      }
+      showActiveRunningOrderCard(name, phone, combinedSummary, combinedBill, false);
 
       btn.disabled = false;
       btn.innerText = "Send Order to Kitchen 🚀";
     }
 
-    // 5. WhatsApp Instant Order Transmission
-    function sendViaWhatsApp() {
-      const name = document.getElementById('custName').value.trim() || 'Guest';
-      const phone = document.getElementById('custPhone').value.trim() || '';
-      const notes = document.getElementById('custNotes').value.trim();
-
-      let text = `*New Table Self-Order — 70MM Lounge*\n` +
-        `📍 Table: ${tableNumber} (${zone})\n` +
-        `👤 Customer: ${name} (${phone})\n` +
-        (notes ? `📝 Note: ${notes}\n` : '') +
-        `\n*Order Items:*\n`;
-
-      document.querySelectorAll('#modalOrderItemsList .order-row').forEach(r => {
-        text += `• ${r.innerText.replace('\n', ' - ')}\n`;
-      });
-      text += `\n*Total Bill:* ${document.getElementById('modalGrandTotal').innerText}`;
-
-      window.open(`https://wa.me/918987477773?text=${encodeURIComponent(text)}`, '_blank');
-    }
-
-    // 6. Customer Checkout Request Button
+    // 5. Checkout / Complete Order Request
     async function handleRequestCheckout() {
       const btn = document.getElementById('btnRequestCheckout');
       btn.disabled = true;
       btn.innerText = "Requesting Checkout...";
 
+      const name = localStorage.getItem('70mm_cust_name') || 'Guest';
+
+      const checkoutPayload = {
+        type: 'CHECKOUT_REQUEST',
+        tableNumber: tableNumber,
+        customerName: name,
+        timestamp: Date.now()
+      };
+
+      // 1. Local Wi-Fi endpoint
       if (posHost) {
         try {
-          await fetch('http://' + posHost + '/api/request-checkout', {
+          fetch('http://' + posHost + '/api/request-checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tableNumber: tableNumber })
-          });
+            body: JSON.stringify(checkoutPayload)
+          }).catch(() => {});
         } catch (_err) {}
       }
+
+      // 2. Cloud Relay (for 4G/5G customers)
+      try {
+        await fetch('https://ntfy.sh/' + CLOUD_ORDERS_TOPIC, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(checkoutPayload)
+        });
+      } catch (_err) {}
+
+      // Update state in localStorage
+      const activeState = JSON.parse(localStorage.getItem('70mm_active_order_' + tableNumber) || '{}');
+      activeState.checkoutRequested = true;
+      localStorage.setItem('70mm_active_order_' + tableNumber, JSON.stringify(activeState));
 
       btn.className = 'btn-checkout-req requested';
       btn.innerText = '🔔 Checkout Requested ⏳ Cashier Notified';
     }
 
-    // 7. Real-Time Status Polling (KOT Status & Billing Completion)
-    function startStatusPolling() {
+    // 6. Display Official Bill on Customer Mobile
+    function displayCustomerBill(bill) {
+      currentActiveBill = bill;
+      localStorage.setItem('70mm_active_bill_' + tableNumber, JSON.stringify(bill));
+
+      // Clear running order card as requested by user
+      document.getElementById('liveStatusBanner').classList.remove('active');
+
+      // Populate bill details
+      document.getElementById('billTableNo').innerText = bill.tableNumber || tableNumber;
+      document.getElementById('billCustName').innerText = bill.customerName || 'Guest';
+      document.getElementById('billCustPhone').innerText = bill.customerPhone ? 'Phone: ' + bill.customerPhone : '';
+      document.getElementById('billDate').innerText = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+      // Items table
+      const tbody = document.getElementById('billItemsTableBody');
+      const items = bill.items || [];
+      tbody.innerHTML = items.map(it => `
+        <tr>
+          <td><strong>${it.name}</strong></td>
+          <td style="text-align: center;">${it.quantity}</td>
+          <td style="text-align: right;">₹${parseFloat(it.rate).toFixed(2)}</td>
+          <td style="text-align: right; font-weight: 700;">₹${parseFloat(it.amount).toFixed(2)}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('billSubtotal').innerText = '₹' + parseFloat(bill.subtotal || 0).toFixed(2);
+      document.getElementById('billTax').innerText = '₹' + parseFloat(bill.taxAmount || 0).toFixed(2);
+      
+      const roundOff = parseFloat(bill.roundOff || 0);
+      if (Math.abs(roundOff) > 0.01) {
+        document.getElementById('billRoundOff').innerText = (roundOff > 0 ? '+₹' : '-₹') + Math.abs(roundOff).toFixed(2);
+        document.getElementById('billRoundOffRow').style.display = 'flex';
+      } else {
+        document.getElementById('billRoundOffRow').style.display = 'none';
+      }
+
+      const totalVal = parseFloat(bill.grandTotal || 0).toFixed(2);
+      document.getElementById('billGrandTotal').innerText = '₹' + totalVal;
+      document.getElementById('qrAmountNotice').innerText = 'Exact Amount: ₹' + totalVal;
+
+      // Dynamic UPI QR Code URL with exact pre-filled amount
+      const upiUrl = `upi://pay?pa=8987477773@okbizaxis&pn=70mm%20Lounge&am=${totalVal}&cu=INR`;
+      const qrCodeImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(upiUrl)}`;
+      document.getElementById('upiQrImage').src = qrCodeImgUrl;
+      document.getElementById('btnDirectUpiPay').href = upiUrl;
+
+      // Show bill container
+      document.getElementById('customerBillContainer').classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 7. 1-Click Bill Download
+    function downloadBillHtml() {
+      const billArea = document.getElementById('printableBillArea');
+      if (!billArea) return;
+
+      const printHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>70MM Lounge Bill - Table ${tableNumber}</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #000; background: #fff; max-width: 400px; margin: 0 auto; }
+            .bill-store-name { font-size: 20px; font-weight: 900; text-align: center; }
+            .bill-subhead { font-size: 12px; text-align: center; color: #555; }
+            .bill-meta { display: flex; justify-content: space-between; font-size: 12px; margin: 8px 0; }
+            table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+            th { border-bottom: 1px solid #000; padding: 4px; text-align: left; }
+            td { padding: 4px; border-bottom: 1px dashed #ccc; }
+            .tot { font-size: 18px; font-weight: bold; border-top: 2px solid #000; padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; }
+          </style>
+        </head>
+        <body>
+          ${billArea.innerHTML}
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([printHtml], { type: 'text/html;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `70mm_Lounge_Bill_Table_${tableNumber}_${Date.now()}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // 8. Customer Confirms UPI Payment
+    async function confirmPaymentFromCustomer() {
+      const amount = currentActiveBill ? currentActiveBill.grandTotal : 0;
+      const paymentPayload = {
+        type: 'PAYMENT_CONFIRMED',
+        tableNumber: tableNumber,
+        amount: amount,
+        paymentMethod: 'UPI',
+        timestamp: Date.now()
+      };
+
+      // 1. Local Wi-Fi
+      if (posHost) {
+        try {
+          fetch('http://' + posHost + '/api/confirm-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentPayload)
+          }).catch(() => {});
+        } catch (_e) {}
+      }
+
+      // 2. Cloud Relay
+      try {
+        await fetch('https://ntfy.sh/' + CLOUD_ORDERS_TOPIC, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(paymentPayload)
+        });
+      } catch (_e) {}
+
+      alert("Thank you! Payment notification sent to POS cashier.");
+    }
+
+    // 9. Real-Time Listeners (Cloud SSE + Local Polling)
+    function startRealtimeListeners() {
+      // A. Cloud Real-Time Bridge (SSE for instant bill arrival & payment settlement)
+      try {
+        if (!!window.EventSource) {
+          sseSource = new EventSource('https://ntfy.sh/' + CLOUD_BILL_TOPIC + '/sse');
+          sseSource.onmessage = function(e) {
+            try {
+              const data = JSON.parse(e.data);
+              const message = data.message ? (typeof data.message === 'string' && data.message.startsWith('{') ? JSON.parse(data.message) : data.message) : data;
+              handleIncomingBillMessage(message);
+            } catch (_err) {}
+          };
+        }
+      } catch (_e) {}
+
+      // B. Polling Fallback (Every 3 seconds)
       if (pollInterval) clearInterval(pollInterval);
       pollInterval = setInterval(async () => {
-        if (!posHost) return;
+        // Poll Cloud Topic
         try {
-          const res = await fetch('http://' + posHost + '/api/table-status?table=' + encodeURIComponent(tableNumber));
-          if (!res.ok) return;
-          const data = await res.json();
-
-          const banner = document.getElementById('liveStatusBanner');
-          const badge = document.getElementById('statusBadge');
-          const msg = document.getElementById('statusMessage');
-          const billEl = document.getElementById('statusBillAmount');
-          const checkoutBtn = document.getElementById('btnRequestCheckout');
-
-          if (data.status === 'OCCUPIED' || data.status === 'CHECKOUT_REQUESTED' || hasPlacedOrder) {
-            banner.classList.add('active');
-            if (data.billAmount > 0) {
-              billEl.innerText = 'Current Running Bill: ₹' + data.billAmount.toFixed(2);
-            }
-
-            if (data.kotStatus === 'READY' || data.kotStatus === 'SERVED') {
-              badge.className = 'status-pill status-ready';
-              badge.innerText = 'SERVED / READY 🍽️';
-              msg.innerText = 'Your food & drinks are served to your table. Enjoy your meal!';
-            } else {
-              badge.className = 'status-pill status-cooking';
-              badge.innerText = 'COOKING 👨‍🍳';
-              msg.innerText = 'Your order is being freshly prepared in the kitchen.';
-            }
-
-            if (data.isCheckoutRequested) {
-              checkoutBtn.className = 'btn-checkout-req requested';
-              checkoutBtn.innerText = '🔔 Checkout Requested ⏳ Cashier Notified';
+          const res = await fetch('https://ntfy.sh/' + CLOUD_BILL_TOPIC + '/json?poll=1&since=10s');
+          if (res.ok) {
+            const text = await res.text();
+            const lines = text.trim().split('\n');
+            for (const line of lines) {
+              if (line.trim().startsWith('{')) {
+                const obj = JSON.parse(line);
+                if (obj.message) {
+                  const parsedMsg = typeof obj.message === 'string' && obj.message.startsWith('{') ? JSON.parse(obj.message) : obj.message;
+                  handleIncomingBillMessage(parsedMsg);
+                }
+              }
             }
           }
+        } catch (_e) {}
 
-          // If bill settled at POS, show Greetings Overlay!
-          if (hasPlacedOrder && (data.status === 'AVAILABLE' || data.status === 'BILLED')) {
-            clearInterval(pollInterval);
-            document.getElementById('greetingsTable').innerText = 'Table ' + tableNumber + ' Bill Settled Successfully';
-            document.getElementById('greetingsOverlay').classList.add('active');
-          }
-        } catch (_err) {}
+        // Poll Local Server (if connected)
+        if (posHost) {
+          try {
+            const res = await fetch('http://' + posHost + '/api/table-status?table=' + encodeURIComponent(tableNumber));
+            if (res.ok) {
+              const data = await res.json();
+              if (data.bill) {
+                displayCustomerBill(data.bill);
+              }
+              if (data.status === 'AVAILABLE' && (currentActiveBill != null || localStorage.getItem('70mm_active_order_' + tableNumber))) {
+                showGreetingsSettled();
+              }
+            }
+          } catch (_e) {}
+        }
       }, 3000);
+    }
+
+    function handleIncomingBillMessage(msg) {
+      if (!msg) return;
+      if (msg.type === 'BILL_READY' || (msg.grandTotal && msg.items)) {
+        displayCustomerBill(msg);
+      } else if (msg.type === 'BILL_SETTLED' || msg.status === 'SETTLED' || msg.status === 'PAID') {
+        showGreetingsSettled();
+      }
+    }
+
+    function showGreetingsSettled() {
+      // Clear storage for table
+      localStorage.removeItem('70mm_active_order_' + tableNumber);
+      localStorage.removeItem('70mm_active_bill_' + tableNumber);
+      document.getElementById('customerBillContainer').classList.remove('active');
+      document.getElementById('liveStatusBanner').classList.remove('active');
+
+      document.getElementById('greetingsTable').innerText = 'Table ' + tableNumber + ' Bill Settled Successfully';
+      document.getElementById('greetingsOverlay').classList.add('active');
+    }
+
+    function startNewSession() {
+      localStorage.removeItem('70mm_active_order_' + tableNumber);
+      localStorage.removeItem('70mm_active_bill_' + tableNumber);
+      location.reload();
     }
 
     window.onload = init;

@@ -120,6 +120,12 @@ interface PosDao {
     @Query("UPDATE kitchen_order_tickets SET completedItems = :completedItems WHERE kotId = :kotId")
     suspend fun updateKotCompletedItems(kotId: Long, completedItems: String)
 
+    @Query("UPDATE kitchen_order_tickets SET status = 'SERVED' WHERE tableNumber = :tableNumber AND status != 'SERVED'")
+    suspend fun clearActiveKotsForTable(tableNumber: String)
+
+    @Query("DELETE FROM kitchen_order_tickets WHERE tableNumber = :tableNumber")
+    suspend fun deleteKotsForTable(tableNumber: String)
+
     @Query("SELECT COUNT(*) FROM kitchen_order_tickets")
     suspend fun getKotCount(): Int
 

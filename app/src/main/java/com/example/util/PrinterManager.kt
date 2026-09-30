@@ -243,7 +243,34 @@ object PrinterManager {
         onComplete: (Boolean, String) -> Unit
     ) {
         withContext(Dispatchers.IO) {
-            // 1. Try USB POS Printer
+            val savedConfig = PrinterPreferences.loadConfig(context)
+
+            // 0a. Check saved USB printer from preferences first
+            if (savedConfig.usbDeviceName.isNotBlank()) {
+                val usbRes = sendBytesToUsb(context, savedConfig.usbDeviceName, data)
+                if (usbRes.first) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Direct Bill Printed! (${usbRes.second})", Toast.LENGTH_SHORT).show()
+                        onComplete(true, usbRes.second)
+                    }
+                    return@withContext
+                }
+            }
+
+            // 0b. Check saved Bluetooth printer from preferences first
+            if (savedConfig.bluetoothDeviceAddress.isNotBlank()) {
+                val btRes = sendBytesToBluetooth(context, savedConfig.bluetoothDeviceAddress, data)
+                if (btRes.first) {
+                    val name = savedConfig.bluetoothDeviceName.ifBlank { savedConfig.bluetoothDeviceAddress }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Direct Bill Printed! ($name)", Toast.LENGTH_SHORT).show()
+                        onComplete(true, btRes.second)
+                    }
+                    return@withContext
+                }
+            }
+
+            // 1. Try any connected USB POS Printer
             val usbPrinters = getConnectedUsbPrinters(context)
             if (usbPrinters.isNotEmpty()) {
                 val usbRes = sendBytesToUsb(context, "", data)
@@ -793,166 +820,179 @@ object PrinterManager {
     }
 
     /**
-     * ESC/POS Byte Array Generator for Customer Receipt
+     * ESC/POS Byte Array Generator for Customer Receipt with Dynamic UPI QR Code & Auto-Cut
      */
     fun generateReceiptEscPos(orderWithItems: OrderWithItems, config: PrinterConfig): ByteArray {
-        val out = ByteArrayOutputStream()
         val order = orderWithItems.order
         val items = orderWithItems.items
         val maxCols = config.paperWidth.lineChars
-        val divider = "-".repeat(maxCols)
 
-        out.write(CMD_INIT)
+        val builder = EscPosBuilder()
+            .initPrinter()
+            .alignCenter()
+            .bold(true)
+            .textSize(EscPosBuilder.SIZE_DOUBLE_BOTH)
+            .textLine("70MM LOUNGE")
+            .textSize(EscPosBuilder.SIZE_NORMAL)
+            .textLine("RESTAURANT & CLUB")
+            .bold(false)
+            .textLine("City Centre, Sector 4, Bokaro Steel City")
+            .textLine("GSTIN: 20AABCL1234F1Z5 | FSSAI: 11522026000123")
+            .textLine("Tel: +91 89874 77773")
+            .feed(1)
+            .alignLeft()
+            .doubleDivider(maxCols)
+            .twoColumn("Invoice No:", order.invoiceNumber, maxCols)
+            .twoColumn("Date & Time:", CurrencyFormatter.formatDateTime(order.timestamp), maxCols)
 
-        // Store Header (Centered & Bold)
-        out.write(CMD_ALIGN_CENTER)
-        out.write(CMD_BOLD_ON)
-        out.write(CMD_DOUBLE_ON)
-        out.write("70MM LOUNGE\n".toByteArray())
-        out.write(CMD_DOUBLE_OFF)
-        out.write("RESTAURANT & CLUB\n".toByteArray())
-        out.write(CMD_BOLD_OFF)
-        out.write("Bokaro | Tel: 8987477773\n".toByteArray())
-        out.write("Email: 70mmlounge8bokaro@gmail.com\n".toByteArray())
-        out.write(LF.toInt())
-
-        // Metadata
-        out.write(CMD_ALIGN_LEFT)
-        out.write(formatTwoColumn("Invoice No:", order.invoiceNumber, maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(formatTwoColumn("Date:", CurrencyFormatter.formatDateTime(order.timestamp), maxCols).toByteArray())
-        out.write(LF.toInt())
         if (order.tableNumber.isNotBlank()) {
-            out.write(formatTwoColumn("Table/Zone:", order.tableNumber, maxCols).toByteArray())
-            out.write(LF.toInt())
+            builder.twoColumn("Table / Zone:", order.tableNumber, maxCols)
         }
-        out.write(formatTwoColumn("Customer:", order.customerName, maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(formatTwoColumn("Payment Mode:", order.paymentMethod, maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write("$divider\n".toByteArray())
+        builder.twoColumn("Customer:", order.customerName, maxCols)
+        builder.twoColumn("Payment Mode:", order.paymentMethod, maxCols)
+        builder.divider(maxCols)
 
-        // Header Line
-        out.write(CMD_BOLD_ON)
-        out.write(formatItemHeader(maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(CMD_BOLD_OFF)
-        out.write("$divider\n".toByteArray())
+        // Header
+        builder.bold(true)
+            .threeColumn("Item", "Qty x Rate", "Total", maxCols)
+            .bold(false)
+            .divider(maxCols)
 
-        // Items
+        // Items with intelligent line wrapping to prevent dish names truncation
         for (item in items) {
-            val name = if (item.productName.length > (maxCols - 14)) item.productName.take(maxCols - 14) else item.productName
             val qtyRate = "${item.quantity}x ${CurrencyFormatter.formatWhole(item.unitPrice)}"
             val lineTotal = CurrencyFormatter.format(item.totalAmount)
-            out.write(formatItemRow(name, qtyRate, lineTotal, maxCols).toByteArray())
-            out.write(LF.toInt())
+            val maxItemCol = if (maxCols >= 48) 22 else 14
+            if (item.productName.length > maxItemCol) {
+                builder.alignLeft().textLine(item.productName)
+                builder.twoColumn("   $qtyRate", lineTotal, maxCols)
+            } else {
+                builder.threeColumn(item.productName, qtyRate, lineTotal, maxCols)
+            }
         }
 
-        out.write("$divider\n".toByteArray())
+        builder.divider(maxCols)
+        builder.twoColumn("Total Items: ${items.size}", "Total Qty: ${items.sumOf { it.quantity }}", maxCols)
+        builder.divider(maxCols)
 
         // Totals
-        out.write(formatTwoColumn("Subtotal:", CurrencyFormatter.format(order.subtotal), maxCols).toByteArray())
-        out.write(LF.toInt())
+        builder.twoColumn("Subtotal:", CurrencyFormatter.format(order.subtotal), maxCols)
         if (order.discountAmount > 0) {
-            out.write(formatTwoColumn("Discount:", "-${CurrencyFormatter.format(order.discountAmount)}", maxCols).toByteArray())
-            out.write(LF.toInt())
+            builder.twoColumn("Discount:", "-${CurrencyFormatter.format(order.discountAmount)}", maxCols)
         }
-        out.write(formatTwoColumn("CGST Tax:", CurrencyFormatter.format(order.taxAmount / 2.0), maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(formatTwoColumn("SGST Tax:", CurrencyFormatter.format(order.taxAmount / 2.0), maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write("$divider\n".toByteArray())
+        val halfTax = order.taxAmount / 2.0
+        builder.twoColumn("CGST Tax (2.5%):", CurrencyFormatter.format(halfTax), maxCols)
+        builder.twoColumn("SGST Tax (2.5%):", CurrencyFormatter.format(halfTax), maxCols)
+        builder.doubleDivider(maxCols)
 
         // Grand Total (Bold & Larger)
-        out.write(CMD_BOLD_ON)
-        out.write(CMD_DOUBLE_ON)
-        out.write(formatTwoColumn("TOTAL:", CurrencyFormatter.format(order.totalAmount), maxCols / 2).toByteArray())
-        out.write(LF.toInt())
-        out.write(CMD_DOUBLE_OFF)
-        out.write(CMD_BOLD_OFF)
+        builder.bold(true)
+            .textSize(EscPosBuilder.SIZE_DOUBLE_BOTH)
+            .twoColumn("NET TOTAL:", CurrencyFormatter.format(order.totalAmount), maxCols / 2)
+            .textSize(EscPosBuilder.SIZE_NORMAL)
+            .bold(false)
+            .feed(1)
+            .alignCenter()
+            .textLine("[ OFFICIAL VERIFIED BILL • 70MM LOUNGE ]")
+            .feed(1)
 
-        out.write(CMD_ALIGN_CENTER)
-        out.write("\n*** THANK YOU VISIT AGAIN ***\n".toByteArray())
-        out.write(LF.toInt())
-        out.write(LF.toInt())
-        out.write(LF.toInt())
+        // Dynamic UPI QR code on printed bill (instant payment with exact bill amount)
+        val upiAmount = String.format(Locale.US, "%.2f", order.totalAmount)
+        val upiString = "upi://pay?pa=8987477773@okbizaxis&pn=70MM%20Lounge&am=$upiAmount&cu=INR&tn=Bill-${order.invoiceNumber}"
 
-        // Cut Paper & Kick Drawer
+        builder.alignCenter()
+            .bold(true)
+            .textLine("--- SCAN TO PAY (INSTANT UPI) ---")
+            .bold(false)
+            .textLine("Google Pay / PhonePe / Paytm / BHIM")
+            .feed(1)
+            .qrCode(upiString, moduleSize = if (config.paperWidth == ThermalPaperWidth.WIDTH_58MM) 5 else 6)
+            .feed(1)
+            .bold(true)
+            .textSize(EscPosBuilder.SIZE_DOUBLE_HEIGHT)
+            .textLine("Amount to Pay: ₹$upiAmount")
+            .textSize(EscPosBuilder.SIZE_NORMAL)
+            .bold(false)
+            .textLine("UPI ID: 8987477773@okbizaxis")
+            .feed(1)
+            .textLine("*** THANK YOU! VISIT AGAIN ***")
+            .textLine("70MM LOUNGE & CLUB • BOKARO")
+            .feed(2)
+
         if (config.autoCutPaper) {
-            out.write(CMD_CUT_PAPER)
+            builder.cutPaper(fullCut = false)
         }
-        out.write(CMD_DRAWER_KICK)
+        builder.kickDrawer()
 
-        return out.toByteArray()
+        return builder.build()
     }
 
     /**
      * ESC/POS Byte Array Generator for KOT
      */
     fun generateKotEscPos(kot: KitchenOrderTicket, config: PrinterConfig): ByteArray {
-        val out = ByteArrayOutputStream()
         val maxCols = config.paperWidth.lineChars
-        val divider = "=".repeat(maxCols)
+        val builder = EscPosBuilder()
+            .initPrinter()
+            .alignCenter()
+            .bold(true)
+            .textSize(EscPosBuilder.SIZE_DOUBLE_BOTH)
+            .textLine("KITCHEN ORDER TICKET")
+            .textLine(kot.kotNumber)
+            .textSize(EscPosBuilder.SIZE_NORMAL)
+            .bold(false)
+            .alignLeft()
+            .twoColumn("TABLE:", kot.tableNumber, maxCols)
+            .twoColumn("ZONE:", kot.zone, maxCols)
+            .twoColumn("TIME:", CurrencyFormatter.formatTimeOnly(kot.timestamp), maxCols)
+            .doubleDivider(maxCols)
+            .bold(true)
 
-        out.write(CMD_INIT)
-        out.write(CMD_ALIGN_CENTER)
-        out.write(CMD_BOLD_ON)
-        out.write(CMD_DOUBLE_ON)
-        out.write("KITCHEN ORDER TICKET\n".toByteArray())
-        out.write("${kot.kotNumber}\n".toByteArray())
-        out.write(CMD_DOUBLE_OFF)
-        out.write(CMD_BOLD_OFF)
-
-        out.write(CMD_ALIGN_LEFT)
-        out.write(formatTwoColumn("TABLE:", kot.tableNumber, maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(formatTwoColumn("ZONE:", kot.zone, maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write(formatTwoColumn("TIME:", CurrencyFormatter.formatTimeOnly(kot.timestamp), maxCols).toByteArray())
-        out.write(LF.toInt())
-        out.write("$divider\n".toByteArray())
-
-        // Items
-        out.write(CMD_BOLD_ON)
         val items = kot.itemsSummary.split(" ; ")
         for (item in items) {
-            out.write(">> $item\n".toByteArray())
+            builder.textLine(">> $item")
         }
-        out.write(CMD_BOLD_OFF)
+        builder.bold(false)
 
         if (kot.specialNotes.isNotBlank()) {
-            out.write("$divider\n".toByteArray())
-            out.write("NOTE: ${kot.specialNotes}\n".toByteArray())
+            builder.divider(maxCols)
+                .textLine("NOTE: ${kot.specialNotes}")
         }
 
-        out.write(LF.toInt())
-        out.write(LF.toInt())
+        builder.feed(2)
         if (config.autoCutPaper) {
-            out.write(CMD_CUT_PAPER)
+            builder.cutPaper(fullCut = false)
         }
 
-        return out.toByteArray()
+        return builder.build()
     }
 
     /**
      * Test Slip ESC/POS
      */
     private fun generateTestSlipEscPos(config: PrinterConfig): ByteArray {
-        val out = ByteArrayOutputStream()
-        out.write(CMD_INIT)
-        out.write(CMD_ALIGN_CENTER)
-        out.write(CMD_BOLD_ON)
-        out.write("70MM LOUNGE POS\n".toByteArray())
-        out.write("PRINTER TEST SUCCESSFUL\n".toByteArray())
-        out.write(CMD_BOLD_OFF)
-        out.write("Mode: ${config.connectionType.displayName}\n".toByteArray())
-        out.write("Paper Width: ${config.paperWidth.label}\n".toByteArray())
-        out.write(SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(Date()).toByteArray())
-        out.write("\n\n\n".toByteArray())
+        val builder = EscPosBuilder()
+            .initPrinter()
+            .alignCenter()
+            .bold(true)
+            .textSize(EscPosBuilder.SIZE_DOUBLE_BOTH)
+            .textLine("70MM LOUNGE POS")
+            .textSize(EscPosBuilder.SIZE_NORMAL)
+            .textLine("PRINTER TEST SUCCESSFUL")
+            .bold(false)
+            .textLine("Mode: ${config.connectionType.displayName}")
+            .textLine("Paper Width: ${config.paperWidth.label}")
+            .textLine(SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault()).format(Date()))
+            .feed(1)
+            .qrCode("https://70mmlounge.com", moduleSize = 5)
+            .feed(1)
+            .textLine("Direct Thermal ESC/POS Ready!")
+            .feed(2)
         if (config.autoCutPaper) {
-            out.write(CMD_CUT_PAPER)
+            builder.cutPaper(fullCut = false)
         }
-        return out.toByteArray()
+        builder.beep(1)
+        return builder.build()
     }
 
     /**
